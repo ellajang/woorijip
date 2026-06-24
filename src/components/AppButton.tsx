@@ -1,6 +1,6 @@
 import { ActivityIndicator, Pressable, StyleSheet, Text, ViewStyle } from 'react-native';
 
-import { Palette, Radius, Space } from '@/theme/tokens';
+import { Palette, Radius, Shadow, Space } from '@/theme/tokens';
 
 type Variant = 'primary' | 'secondary' | 'danger';
 
@@ -14,6 +14,18 @@ interface AppButtonProps {
   style?: ViewStyle;
 }
 
+const variantBg: Record<Variant, string> = {
+  primary: Palette.primary,
+  secondary: Palette.primarySoft,
+  danger: Palette.danger,
+};
+
+const variantText: Record<Variant, string> = {
+  primary: Palette.white,
+  secondary: Palette.primary,
+  danger: Palette.white,
+};
+
 export function AppButton({
   label,
   onPress,
@@ -24,6 +36,7 @@ export function AppButton({
   style,
 }: AppButtonProps) {
   const isDisabled = disabled || loading;
+  const filled = variant !== 'secondary';
   return (
     <Pressable
       onPress={onPress}
@@ -33,15 +46,18 @@ export function AppButton({
       style={({ pressed }) => [
         styles.base,
         large && styles.large,
-        variantStyles[variant],
+        { backgroundColor: variantBg[variant] },
+        filled && !isDisabled && Shadow.button,
         pressed && !isDisabled && styles.pressed,
         isDisabled && styles.disabled,
         style,
       ]}>
       {loading ? (
-        <ActivityIndicator color={Palette.white} />
+        <ActivityIndicator color={variantText[variant]} />
       ) : (
-        <Text style={[styles.label, large && styles.labelLarge]}>{label}</Text>
+        <Text style={[styles.label, large && styles.labelLarge, { color: variantText[variant] }]}>
+          {label}
+        </Text>
       )}
     </Pressable>
   );
@@ -49,7 +65,7 @@ export function AppButton({
 
 const styles = StyleSheet.create({
   base: {
-    minHeight: 52,
+    minHeight: 54,
     paddingHorizontal: Space.lg,
     borderRadius: Radius.md,
     alignItems: 'center',
@@ -60,13 +76,13 @@ const styles = StyleSheet.create({
     borderRadius: Radius.lg,
   },
   pressed: {
-    opacity: 0.85,
+    opacity: 0.9,
+    transform: [{ scale: 0.99 }],
   },
   disabled: {
     opacity: 0.5,
   },
   label: {
-    color: Palette.white,
     fontSize: 17,
     fontWeight: '700',
   },
@@ -74,9 +90,3 @@ const styles = StyleSheet.create({
     fontSize: 24,
   },
 });
-
-const variantStyles: Record<Variant, ViewStyle> = {
-  primary: { backgroundColor: Palette.primary },
-  secondary: { backgroundColor: Palette.textMuted },
-  danger: { backgroundColor: Palette.danger },
-};

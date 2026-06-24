@@ -6,7 +6,7 @@ import { AppButton } from '@/components/AppButton';
 import { useManuals } from '@/features/manuals/hooks';
 import { Manual } from '@/features/manuals/types';
 import { isSupabaseConfigured } from '@/lib/config';
-import { Palette, Radius, Space } from '@/theme/tokens';
+import { Palette, Radius, Shadow, Space } from '@/theme/tokens';
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -94,6 +94,9 @@ function ManualRow({
 function EmptyState() {
   return (
     <View style={styles.empty}>
+      <View style={styles.emptyIcon}>
+        <Text style={styles.emptyEmoji}>🎬</Text>
+      </View>
       <Text style={styles.emptyTitle}>아직 만든 설명서가 없어요</Text>
       <Text style={styles.emptyBody}>
         부모님께 설명할 영상을 찍고{'\n'}QR을 만들어 제품에 붙여보세요.
@@ -133,7 +136,7 @@ const styles = StyleSheet.create({
   },
   listContent: {
     padding: Space.md,
-    gap: Space.sm,
+    gap: Space.md,
     flexGrow: 1,
   },
   row: {
@@ -142,7 +145,8 @@ const styles = StyleSheet.create({
     gap: Space.sm,
     padding: Space.md,
     backgroundColor: Palette.surface,
-    borderRadius: Radius.md,
+    borderRadius: Radius.lg,
+    ...Shadow.card,
   },
   rowMain: {
     flex: 1,
@@ -151,13 +155,13 @@ const styles = StyleSheet.create({
     gap: Space.md,
   },
   rowPressed: {
-    opacity: 0.7,
+    opacity: 0.6,
   },
   qrBtn: {
     paddingHorizontal: Space.md,
     paddingVertical: Space.sm,
     borderRadius: Radius.sm,
-    backgroundColor: '#EAF3FE',
+    backgroundColor: Palette.primarySoft,
   },
   qrBtnText: {
     fontSize: 15,
@@ -165,15 +169,15 @@ const styles = StyleSheet.create({
     color: Palette.primary,
   },
   rowIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: Radius.sm,
-    backgroundColor: Palette.primary,
+    width: 48,
+    height: 48,
+    borderRadius: Radius.md,
+    backgroundColor: Palette.primarySoft,
     alignItems: 'center',
     justifyContent: 'center',
   },
   rowIconText: {
-    color: Palette.white,
+    color: Palette.primary,
     fontSize: 18,
   },
   rowBody: {
@@ -195,6 +199,18 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: Space.sm,
     paddingVertical: Space.xxl,
+  },
+  emptyIcon: {
+    width: 96,
+    height: 96,
+    borderRadius: Radius.pill,
+    backgroundColor: Palette.accentSoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: Space.sm,
+  },
+  emptyEmoji: {
+    fontSize: 44,
   },
   emptyTitle: {
     fontSize: 20,

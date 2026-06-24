@@ -1,7 +1,7 @@
 import { StyleSheet, Text, View } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 
-import { Palette, Radius, Space } from '@/theme/tokens';
+import { Palette, Radius, Shadow, Space } from '@/theme/tokens';
 
 export function ManualQrCard({ title, url }: { title: string; url: string }) {
   return (
@@ -42,9 +42,8 @@ const styles = StyleSheet.create({
     padding: Space.lg,
     backgroundColor: Palette.white,
     borderRadius: Radius.lg,
-    borderWidth: 1,
-    borderColor: Palette.border,
     marginVertical: Space.md,
+    ...Shadow.card,
   },
   hint: {
     fontSize: 15,

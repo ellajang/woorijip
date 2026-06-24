@@ -157,8 +157,9 @@ const styles = StyleSheet.create({
   },
   exampleChip: {
     fontSize: 14,
+    fontWeight: '600',
     color: Palette.primary,
-    backgroundColor: '#EAF3FE',
+    backgroundColor: Palette.primarySoft,
     paddingHorizontal: Space.md,
     paddingVertical: Space.sm,
     borderRadius: Radius.pill,
