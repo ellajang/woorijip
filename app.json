@@ -37,6 +37,13 @@
       ],
       "expo-video",
       [
+        "expo-media-library",
+        {
+          "savePhotosPermission": "만든 QR 이미지를 사진첩에 저장합니다.",
+          "isAccessMediaLocationEnabled": false
+        }
+      ],
+      [
         "expo-camera",
         {
           "cameraPermission": "부모님께 보여줄 설명 영상을 촬영하기 위해 카메라를 사용합니다.",
