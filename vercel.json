@@ -1,0 +1,9 @@
+{
+  "buildCommand": "npx expo export -p web",
+  "outputDirectory": "dist",
+  "framework": null,
+  "rewrites": [
+    { "source": "/v/:id", "destination": "/v/[id].html" },
+    { "source": "/qr/:id", "destination": "/qr/[id].html" }
+  ]
+}
