@@ -65,19 +65,19 @@ export function AppButton({
 
 const styles = StyleSheet.create({
   base: {
-    minHeight: 54,
+    minHeight: 56,
     paddingHorizontal: Space.lg,
-    borderRadius: Radius.md,
+    borderRadius: Radius.lg,
     alignItems: 'center',
     justifyContent: 'center',
   },
   large: {
-    minHeight: 72,
-    borderRadius: Radius.lg,
+    minHeight: 76,
+    borderRadius: Radius.pill,
   },
   pressed: {
-    opacity: 0.9,
-    transform: [{ scale: 0.99 }],
+    opacity: 0.92,
+    transform: [{ scale: 0.98 }],
   },
   disabled: {
     opacity: 0.5,
@@ -85,8 +85,9 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 17,
     fontWeight: '700',
+    letterSpacing: -0.2,
   },
   labelLarge: {
-    fontSize: 24,
+    fontSize: 22,
   },
 });

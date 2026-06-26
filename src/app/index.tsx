@@ -1,20 +1,84 @@
-import { useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
+import { Stack, useRouter } from 'expo-router';
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppButton } from '@/components/AppButton';
-import { useManuals } from '@/features/manuals/hooks';
+import { useDialog } from '@/components/DialogProvider';
+import { useAuth } from '@/features/auth/AuthContext';
+import { useDeleteManual, useManuals } from '@/features/manuals/hooks';
 import { Manual } from '@/features/manuals/types';
 import { isSupabaseConfigured } from '@/lib/config';
-import { Palette, Radius, Shadow, Space } from '@/theme/tokens';
+import { Palette, Radius, Shadow, Space, Type } from '@/theme/tokens';
+
+/** 무료로 만들 수 있는 설명서 개수. 초과 시 Pro 안내. */
+const FREE_LIMIT = 3;
 
 export default function HomeScreen() {
   const router = useRouter();
+  const { session } = useAuth();
+  const { confirm, alert } = useDialog();
   const configured = isSupabaseConfigured();
-  const { data: manuals, isLoading, isError, error, refetch } = useManuals();
+  const { data: manuals, isLoading, isError, error, refetch } = useManuals(session?.user.id);
+  const deleteManual = useDeleteManual();
+
+  const count = manuals?.length ?? 0;
+  const atFreeLimit = count >= FREE_LIMIT;
+
+  function guardCreate(proceed: () => void) {
+    if (atFreeLimit) {
+      alert(
+        '무료 한도에 도달했어요',
+        `무료로는 설명서를 ${FREE_LIMIT}개까지 만들 수 있어요.\n기존 설명서를 삭제하거나, 곧 나올 Pro를 이용해주세요.`,
+      );
+      return;
+    }
+    proceed();
+  }
+
+  async function handleDelete(manual: Manual) {
+    const ok = await confirm({
+      title: '설명서 삭제',
+      message: '영상이 지워지고, 붙여둔 QR 스티커도 더 이상 안 열려요.',
+      confirmLabel: '삭제',
+      destructive: true,
+    });
+    if (!ok) return;
+    deleteManual.mutate(
+      { id: manual.id, videoPath: manual.videoPath },
+      { onError: (e) => alert('삭제 실패', e.message) },
+    );
+  }
+
+  async function handlePickVideo() {
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['videos'],
+        videoMaxDuration: 600,
+        quality: 1,
+      });
+      if (!result.canceled && result.assets[0]?.uri) {
+        router.push({ pathname: '/save', params: { videoUri: result.assets[0].uri } });
+      }
+    } catch (e) {
+      alert('영상 가져오기 실패', e instanceof Error ? e.message : '잠시 후 다시 시도해주세요.');
+    }
+  }
 
   return (
-    <SafeAreaView style={styles.container} edges={['bottom']}>
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+      <Stack.Screen options={{ headerShown: false }} />
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>우리집 설명서</Text>
+        <Pressable
+          onPress={() => router.push('/settings')}
+          hitSlop={12}
+          accessibilityRole="button"
+          accessibilityLabel="설정">
+          <Ionicons name="options-outline" size={26} color={Palette.primary} />
+        </Pressable>
+      </View>
       {!configured && <ConfigNotice />}
 
       {isLoading && configured ? (
@@ -38,18 +102,25 @@ export default function HomeScreen() {
               manual={item}
               onPress={() => router.push(`/v/${item.id}`)}
               onShowQr={() => router.push(`/qr/${item.id}`)}
+              onDelete={() => handleDelete(item)}
             />
           )}
         />
       )}
 
       <View style={styles.footer}>
+        <Text style={styles.usage}>
+          무료 {count}/{FREE_LIMIT}개 사용 중
+        </Text>
         <AppButton
-          label="+ 새 설명서 만들기"
-          onPress={() => router.push('/record')}
+          label="직접 촬영하기"
+          onPress={() => guardCreate(() => router.push('/record'))}
           large
           disabled={!configured}
         />
+        <Text style={styles.galleryLink} onPress={() => guardCreate(handlePickVideo)}>
+          갤러리에서 영상 가져오기
+        </Text>
       </View>
     </SafeAreaView>
   );
@@ -59,10 +130,12 @@ function ManualRow({
   manual,
   onPress,
   onShowQr,
+  onDelete,
 }: {
   manual: Manual;
   onPress: () => void;
   onShowQr: () => void;
+  onDelete: () => void;
 }) {
   return (
     <View style={styles.row}>
@@ -70,9 +143,6 @@ function ManualRow({
         onPress={onPress}
         accessibilityRole="button"
         style={({ pressed }) => [styles.rowMain, pressed && styles.rowPressed]}>
-        <View style={styles.rowIcon}>
-          <Text style={styles.rowIconText}>▶</Text>
-        </View>
         <View style={styles.rowBody}>
           <Text style={styles.rowTitle} numberOfLines={1}>
             {manual.title}
@@ -86,6 +156,14 @@ function ManualRow({
         accessibilityLabel="QR 코드 보기"
         style={({ pressed }) => [styles.qrBtn, pressed && styles.rowPressed]}>
         <Text style={styles.qrBtnText}>QR</Text>
+      </Pressable>
+      <Pressable
+        onPress={onDelete}
+        accessibilityRole="button"
+        accessibilityLabel="설명서 삭제"
+        hitSlop={8}
+        style={({ pressed }) => [styles.deleteBtn, pressed && styles.rowPressed]}>
+        <Ionicons name="trash-outline" size={20} color={Palette.danger} />
       </Pressable>
     </View>
   );
@@ -127,6 +205,20 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: Palette.background,
   },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: Space.lg,
+    paddingTop: Space.sm,
+    paddingBottom: Space.sm,
+  },
+  headerTitle: {
+    fontSize: Type.title,
+    fontWeight: '800',
+    letterSpacing: -0.5,
+    color: Palette.text,
+  },
   center: {
     flex: 1,
     alignItems: 'center',
@@ -135,7 +227,7 @@ const styles = StyleSheet.create({
     padding: Space.lg,
   },
   listContent: {
-    padding: Space.md,
+    padding: Space.lg,
     gap: Space.md,
     flexGrow: 1,
   },
@@ -143,7 +235,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: Space.sm,
-    padding: Space.md,
+    padding: Space.lg,
     backgroundColor: Palette.surface,
     borderRadius: Radius.lg,
     ...Shadow.card,
@@ -168,29 +260,37 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: Palette.primary,
   },
-  rowIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: Radius.md,
-    backgroundColor: Palette.primarySoft,
+  deleteBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: Radius.sm,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  rowIconText: {
-    color: Palette.primary,
-    fontSize: 18,
+  galleryLink: {
+    fontSize: 15,
+    color: Palette.textMuted,
+    textAlign: 'center',
+    paddingVertical: Space.sm,
+    fontWeight: '600',
+  },
+  usage: {
+    fontSize: Type.caption,
+    color: Palette.textMuted,
+    textAlign: 'center',
   },
   rowBody: {
     flex: 1,
   },
   rowTitle: {
-    fontSize: 18,
-    fontWeight: '600',
+    fontSize: Type.headline,
+    fontWeight: '700',
+    letterSpacing: -0.3,
     color: Palette.text,
   },
   rowDate: {
-    marginTop: 2,
-    fontSize: 13,
+    marginTop: 4,
+    fontSize: Type.caption,
     color: Palette.textMuted,
   },
   empty: {
@@ -213,18 +313,20 @@ const styles = StyleSheet.create({
     fontSize: 44,
   },
   emptyTitle: {
-    fontSize: 20,
-    fontWeight: '700',
+    fontSize: Type.title,
+    fontWeight: '800',
+    letterSpacing: -0.4,
     color: Palette.text,
   },
   emptyBody: {
-    fontSize: 15,
-    lineHeight: 22,
+    fontSize: Type.body,
+    lineHeight: 24,
     color: Palette.textMuted,
     textAlign: 'center',
   },
   footer: {
     padding: Space.md,
+    gap: Space.sm,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: Palette.border,
   },

@@ -28,3 +28,9 @@ export function getWebBaseUrl(): string {
 export function isSupabaseConfigured(): boolean {
   return Boolean(SUPABASE_URL && SUPABASE_ANON_KEY);
 }
+
+/** 비밀번호 재설정 메일이 돌아올 웹 페이지 URL. 웹 베이스가 없으면 undefined. */
+export function passwordResetUrl(): string | undefined {
+  const base = getWebBaseUrl();
+  return base ? `${base}/reset` : undefined;
+}

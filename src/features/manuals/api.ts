@@ -14,6 +14,13 @@ import { CreateManualInput, Manual, ManualRow, mapManualRow } from './types';
  * 업로드 성공 후에만 row를 만들어 "영상 없는 설명서"가 남지 않게 한다.
  */
 export async function createManual({ title, videoUri }: CreateManualInput): Promise<Manual> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    throw new Error('로그인이 필요해요.');
+  }
+
   const id = randomUUID();
   const videoPath = `${id}.mp4`;
 
@@ -28,7 +35,7 @@ export async function createManual({ title, videoUri }: CreateManualInput): Prom
 
   const { data, error } = await supabase
     .from('manuals')
-    .insert({ id, title, video_path: videoPath })
+    .insert({ id, title, video_path: videoPath, user_id: user.id })
     .select()
     .single<ManualRow>();
 
@@ -54,10 +61,12 @@ export async function getManual(id: string): Promise<Manual | null> {
   return data ? mapManualRow(data) : null;
 }
 
-export async function listManuals(): Promise<Manual[]> {
+/** 로그인한 사용자 본인의 설명서만 조회 */
+export async function listManuals(userId: string): Promise<Manual[]> {
   const { data, error } = await supabase
     .from('manuals')
     .select()
+    .eq('user_id', userId)
     .order('created_at', { ascending: false })
     .returns<ManualRow[]>();
 
@@ -65,6 +74,34 @@ export async function listManuals(): Promise<Manual[]> {
     throw new Error(`목록 조회 실패: ${error.message}`);
   }
   return (data ?? []).map(mapManualRow);
+}
+
+/** 내 설명서 삭제 (영상 파일 + DB row). RLS로 본인 것만 가능. */
+export async function deleteManual({
+  id,
+  videoPath,
+}: {
+  id: string;
+  videoPath: string;
+}): Promise<void> {
+  // 영상 파일 먼저 제거 (실패해도 row 삭제는 진행 — 고아 파일은 추후 정리)
+  await supabase.storage.from(VIDEO_BUCKET).remove([videoPath]);
+
+  const { error } = await supabase.from('manuals').delete().eq('id', id);
+  if (error) {
+    throw new Error(`삭제 실패: ${error.message}`);
+  }
+}
+
+/**
+ * 계정 + 내 모든 데이터 삭제.
+ * auth.users 삭제는 권한상 클라이언트에서 불가 → Edge Function(service_role)이 처리.
+ */
+export async function deleteAccount(): Promise<void> {
+  const { error } = await supabase.functions.invoke('delete-account', { method: 'POST' });
+  if (error) {
+    throw new Error(`계정 삭제 실패: ${error.message}`);
+  }
 }
 
 /** Storage 경로 → 공개 재생 URL */

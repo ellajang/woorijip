@@ -20,9 +20,9 @@ export const Palette = {
 } as const;
 
 export const Radius = {
-  sm: 10,
-  md: 14,
-  lg: 22,
+  sm: 14,
+  md: 20,
+  lg: 28,
   pill: 999,
 } as const;
 
@@ -35,21 +35,30 @@ export const Space = {
   xxl: 48,
 } as const;
 
+/** 트렌디한 타이포 스케일 */
+export const Type = {
+  display: 28,
+  title: 22,
+  headline: 19,
+  body: 16,
+  caption: 13,
+} as const;
+
 /** 카드/버튼에 얹는 부드러운 그림자 (iOS shadow* + Android elevation) */
 export const Shadow = {
   card: {
     shadowColor: '#1F2328',
-    shadowOpacity: 0.06,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 2,
+    shadowOpacity: 0.07,
+    shadowRadius: 20,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 3,
   },
   button: {
     shadowColor: '#2B8AEF',
-    shadowOpacity: 0.22,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 3,
+    shadowOpacity: 0.24,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 4,
   },
 } as const;
 

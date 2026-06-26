@@ -44,6 +44,12 @@
         }
       ],
       [
+        "expo-image-picker",
+        {
+          "photosPermission": "갤러리에서 설명 영상을 가져오기 위해 사진 접근을 사용합니다."
+        }
+      ],
+      [
         "expo-camera",
         {
           "cameraPermission": "부모님께 보여줄 설명 영상을 촬영하기 위해 카메라를 사용합니다.",
