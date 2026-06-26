@@ -4,7 +4,7 @@
   "framework": null,
   "cleanUrls": true,
   "rewrites": [
-    { "source": "/v/:id", "destination": "/v/[id].html" },
-    { "source": "/qr/:id", "destination": "/qr/[id].html" }
+    { "source": "/v/:id", "destination": "/v/[id]" },
+    { "source": "/qr/:id", "destination": "/qr/[id]" }
   ]
 }
