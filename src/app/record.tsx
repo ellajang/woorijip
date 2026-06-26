@@ -1,9 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
 import { CameraView, useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
+import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import * as VideoThumbnails from 'expo-video-thumbnails';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -29,7 +30,27 @@ export default function RecordScreen() {
   const [micPermission, requestMic] = useMicrophonePermissions();
   const [isRecording, setIsRecording] = useState(false);
   const [clips, setClips] = useState<Clip[]>([]);
+  const [countdown, setCountdown] = useState<number | null>(null);
+  const [elapsed, setElapsed] = useState(0);
+  const countdownRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { alert } = useDialog();
+
+  // 언마운트 시 카운트다운 타이머 정리
+  useEffect(() => {
+    return () => {
+      if (countdownRef.current) clearTimeout(countdownRef.current);
+    };
+  }, []);
+
+  // 녹화 중 경과시간(초)
+  useEffect(() => {
+    if (!isRecording) {
+      setElapsed(0);
+      return;
+    }
+    const id = setInterval(() => setElapsed((e) => e + 1), 1000);
+    return () => clearInterval(id);
+  }, [isRecording]);
 
   // TODO: 구독 결제 연동 시 실제 Pro 여부로 교체
   const isPro = false;
@@ -65,6 +86,7 @@ export default function RecordScreen() {
       handleStop();
       return;
     }
+    if (countdown !== null) return;
     if (atClipLimit) {
       alert(
         'Pro로 업그레이드',
@@ -72,11 +94,31 @@ export default function RecordScreen() {
       );
       return;
     }
-    handleStart();
+    startCountdown();
+  }
+
+  // 3·2·1 카운트다운 후 녹화 시작
+  function startCountdown() {
+    let n = 3;
+    setCountdown(n);
+    Haptics.selectionAsync();
+    const tick = () => {
+      n -= 1;
+      if (n > 0) {
+        setCountdown(n);
+        Haptics.selectionAsync();
+        countdownRef.current = setTimeout(tick, 800);
+      } else {
+        setCountdown(null);
+        handleStart();
+      }
+    };
+    countdownRef.current = setTimeout(tick, 800);
   }
 
   async function handleStart() {
     if (!cameraRef.current || isRecording || atClipLimit) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setIsRecording(true);
     try {
       const video = await cameraRef.current.recordAsync({ maxDuration: MAX_DURATION_SEC });
@@ -90,6 +132,7 @@ export default function RecordScreen() {
           thumb = null;
         }
         setClips((prev) => [...prev, { uri: video.uri, thumb }]);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       }
     } catch {
       setIsRecording(false);
@@ -98,6 +141,7 @@ export default function RecordScreen() {
 
   function handleStop() {
     if (!cameraRef.current || !isRecording) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     cameraRef.current.stopRecording();
   }
 
@@ -111,10 +155,11 @@ export default function RecordScreen() {
   }
 
   const takeNumber = clips.length + 1;
+  const mmss = `${Math.floor(elapsed / 60)}:${String(elapsed % 60).padStart(2, '0')}`;
   const takeText = isRecording
-    ? `● ${takeNumber}번 촬영 중`
+    ? `● ${takeNumber}번 촬영 중  ${mmss}`
     : atClipLimit
-      ? `무료는 ${FREE_CLIPS}개까지 — Pro로 더 나눠요`
+      ? 'Pro로 업그레이드하고 더 나누기'
       : `${takeNumber}번 촬영`;
 
   return (
@@ -125,6 +170,11 @@ export default function RecordScreen() {
           <View style={styles.takeBar}>
             <Text style={styles.takeText}>{takeText}</Text>
           </View>
+          {countdown !== null && (
+            <View style={styles.countdownOverlay}>
+              <Text style={styles.countdownText}>{countdown}</Text>
+            </View>
+          )}
         </View>
 
         {clips.length > 0 && (
@@ -222,6 +272,17 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: '800',
     letterSpacing: -0.3,
+  },
+  countdownOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.4)',
+  },
+  countdownText: {
+    color: Palette.white,
+    fontSize: 120,
+    fontWeight: '900',
   },
   strip: {
     maxHeight: 84,
