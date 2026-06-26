@@ -37,14 +37,16 @@ Deno.serve(async (req) => {
     if (userErr || !userData.user) return json({ error: '인증 실패' }, 401);
     const userId = userData.user.id;
 
-    // 1) 이 사용자의 영상 경로 수집
+    // 1) 이 사용자의 모든 영상 클립 경로 수집
     const { data: manuals } = await admin
       .from('manuals')
-      .select('video_path')
+      .select('video_path, video_paths')
       .eq('user_id', userId);
 
-    // 2) 스토리지 영상 삭제
-    const paths = (manuals ?? []).map((m: { video_path: string }) => m.video_path);
+    // 2) 스토리지 영상 삭제 (클립 배열 우선, 없으면 단일 경로)
+    const paths = (manuals ?? []).flatMap((m: { video_path: string; video_paths: string[] | null }) =>
+      m.video_paths && m.video_paths.length > 0 ? m.video_paths : [m.video_path],
+    );
     if (paths.length > 0) {
       await admin.storage.from('videos').remove(paths);
     }

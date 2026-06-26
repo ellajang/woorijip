@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
-import { createManual, deleteManual, getManual, listManuals } from './api';
+import { createManual, deleteManual, getManual, listManuals, updateManualTitle } from './api';
 import { CreateManualInput, Manual } from './types';
 
 const manualKeys = {
@@ -37,9 +37,25 @@ export function useCreateManual() {
 
 export function useDeleteManual() {
   const queryClient = useQueryClient();
-  return useMutation<void, Error, { id: string; videoPath: string }>({
+  return useMutation<void, Error, { id: string; videoPaths: string[] }>({
     mutationFn: deleteManual,
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: manualKeys.all });
+    },
+  });
+}
+
+export function useUpdateManual() {
+  const queryClient = useQueryClient();
+  return useMutation<void, Error, { id: string; title: string }>({
+    mutationFn: updateManualTitle,
+    onSuccess: (_result, { id, title }) => {
+      // 서버 재조회를 기다리지 않고 캐시(목록·상세)를 즉시 패치 → 바로 반영
+      queryClient.setQueriesData<Manual[] | Manual | null>({ queryKey: manualKeys.all }, (old) => {
+        if (!old) return old;
+        if (Array.isArray(old)) return old.map((m) => (m.id === id ? { ...m, title } : m));
+        return old.id === id ? { ...old, title } : old;
+      });
       queryClient.invalidateQueries({ queryKey: manualKeys.all });
     },
   });

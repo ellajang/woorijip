@@ -1,5 +1,14 @@
 import { createContext, useContext, useMemo, useRef, useState } from 'react';
-import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import {
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Palette, Radius, Shadow, Space, Type } from '@/theme/tokens';
@@ -12,24 +21,35 @@ interface ConfirmOptions {
   destructive?: boolean;
 }
 
-interface DialogState extends ConfirmOptions {
-  kind: 'confirm' | 'alert';
+interface PromptOptions {
+  title: string;
+  message?: string;
+  defaultValue?: string;
+  placeholder?: string;
+  confirmLabel?: string;
+  maxLength?: number;
+}
+
+interface DialogState extends ConfirmOptions, PromptOptions {
+  kind: 'confirm' | 'alert' | 'prompt';
 }
 
 interface DialogApi {
   confirm: (opts: ConfirmOptions) => Promise<boolean>;
   alert: (title: string, message?: string) => Promise<void>;
+  prompt: (opts: PromptOptions) => Promise<string | null>;
 }
 
 const DialogContext = createContext<DialogApi | null>(null);
 
-/** 앱 톤에 맞춘 커스텀 확인/알림 다이얼로그. OS 기본 Alert 대신 사용한다. */
+/** 앱 톤에 맞춘 커스텀 확인/알림/입력 다이얼로그(바텀시트). OS 기본 Alert 대신 사용한다. */
 export function DialogProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<DialogState | null>(null);
-  const resolverRef = useRef<((value: boolean) => void) | null>(null);
+  const [input, setInput] = useState('');
+  const resolverRef = useRef<((value: unknown) => void) | null>(null);
   const insets = useSafeAreaInsets();
 
-  function close(result: boolean) {
+  function close(result: unknown) {
     setState(null);
     resolverRef.current?.(result);
     resolverRef.current = null;
@@ -39,7 +59,7 @@ export function DialogProvider({ children }: { children: React.ReactNode }) {
     () => ({
       confirm(opts) {
         return new Promise<boolean>((resolve) => {
-          resolverRef.current = resolve;
+          resolverRef.current = (v) => resolve(v === true);
           setState({ kind: 'confirm', ...opts });
         });
       },
@@ -49,50 +69,82 @@ export function DialogProvider({ children }: { children: React.ReactNode }) {
           setState({ kind: 'alert', title, message });
         });
       },
+      prompt(opts) {
+        return new Promise<string | null>((resolve) => {
+          resolverRef.current = (v) => resolve(typeof v === 'string' ? v : null);
+          setInput(opts.defaultValue ?? '');
+          setState({ kind: 'prompt', ...opts });
+        });
+      },
     }),
     [],
   );
 
   const isConfirm = state?.kind === 'confirm';
+  const isPrompt = state?.kind === 'prompt';
+  const canSubmitPrompt = !isPrompt || input.trim().length > 0;
 
   return (
     <DialogContext.Provider value={api}>
       {children}
-      <Modal visible={state !== null} transparent animationType="slide" onRequestClose={() => close(false)}>
-        <Pressable style={styles.backdrop} onPress={() => close(false)}>
-          <Pressable style={[styles.card, { paddingBottom: insets.bottom + Space.lg }]} onPress={() => {}}>
+      <Modal
+        visible={state !== null}
+        transparent
+        animationType="slide"
+        onRequestClose={() => close(isPrompt ? null : false)}>
+        <KeyboardAvoidingView
+          style={styles.backdrop}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => close(isPrompt ? null : false)} />
+          <View style={[styles.card, { paddingBottom: insets.bottom + Space.lg }]}>
             <View style={styles.handle} />
             {state?.title ? <Text style={styles.title}>{state.title}</Text> : null}
             {state?.message ? <Text style={styles.message}>{state.message}</Text> : null}
 
+            {isPrompt && (
+              <TextInput
+                style={styles.input}
+                value={input}
+                onChangeText={setInput}
+                placeholder={state?.placeholder}
+                placeholderTextColor={Palette.textMuted}
+                maxLength={state?.maxLength ?? 40}
+                autoFocus
+                returnKeyType="done"
+                onSubmitEditing={() => canSubmitPrompt && close(input.trim())}
+              />
+            )}
+
             <View style={styles.actions}>
-              {isConfirm ? (
+              {isConfirm || isPrompt ? (
                 <>
                   <Pressable
                     style={({ pressed }) => [styles.btn, styles.cancelBtn, pressed && styles.pressed]}
-                    onPress={() => close(false)}>
+                    onPress={() => close(isPrompt ? null : false)}>
                     <Text style={styles.cancelText}>{state?.cancelLabel ?? '취소'}</Text>
                   </Pressable>
                   <Pressable
+                    disabled={isPrompt && !canSubmitPrompt}
                     style={({ pressed }) => [
                       styles.btn,
                       state?.destructive ? styles.dangerBtn : styles.confirmBtn,
                       pressed && styles.pressed,
+                      isPrompt && !canSubmitPrompt && styles.btnDisabled,
                     ]}
-                    onPress={() => close(true)}>
+                    onPress={() => close(isPrompt ? input.trim() : true)}>
                     <Text style={styles.confirmText}>{state?.confirmLabel ?? '확인'}</Text>
                   </Pressable>
                 </>
               ) : (
                 <Pressable
                   style={({ pressed }) => [styles.btn, styles.confirmBtn, pressed && styles.pressed]}
-                  onPress={() => close(true)}>
+                  onPress={() => close(undefined)}>
                   <Text style={styles.confirmText}>확인</Text>
                 </Pressable>
               )}
             </View>
-          </Pressable>
-        </Pressable>
+          </View>
+        </KeyboardAvoidingView>
       </Modal>
     </DialogContext.Provider>
   );
@@ -141,6 +193,17 @@ const styles = StyleSheet.create({
     color: Palette.textMuted,
     textAlign: 'center',
   },
+  input: {
+    borderWidth: 1,
+    borderColor: Palette.border,
+    borderRadius: Radius.md,
+    paddingHorizontal: Space.md,
+    paddingVertical: Space.md,
+    fontSize: 17,
+    color: Palette.text,
+    backgroundColor: Palette.background,
+    marginTop: Space.xs,
+  },
   actions: {
     flexDirection: 'row',
     gap: Space.sm,
@@ -152,6 +215,9 @@ const styles = StyleSheet.create({
     borderRadius: Radius.md,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  btnDisabled: {
+    opacity: 0.5,
   },
   pressed: {
     opacity: 0.85,

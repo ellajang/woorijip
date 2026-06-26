@@ -1,11 +1,14 @@
+import { Ionicons } from '@expo/vector-icons';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { useDialog } from '@/components/DialogProvider';
+import { useAuth } from '@/features/auth/AuthContext';
 import { getVideoPublicUrl } from '@/features/manuals/api';
-import { useManual } from '@/features/manuals/hooks';
+import { useManual, useUpdateManual } from '@/features/manuals/hooks';
 import { Palette, Radius, SeniorSize, Space } from '@/theme/tokens';
 
 /**
@@ -16,17 +19,60 @@ import { Palette, Radius, SeniorSize, Space } from '@/theme/tokens';
 export default function ViewerScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { data: manual, isLoading, isError } = useManual(id ?? '');
+  const { session } = useAuth();
+  const { prompt, alert } = useDialog();
+  const updateManual = useUpdateManual();
 
-  const videoUrl = manual ? getVideoPublicUrl(manual.videoPath) : '';
+  const isOwner = Boolean(session?.user?.id && manual?.userId && session.user.id === manual.userId);
+
+  async function handleEditTitle() {
+    if (!manual) return;
+    const newTitle = await prompt({
+      title: '제목 수정',
+      defaultValue: manual.title,
+      placeholder: '예: TV 켜는 방법',
+      confirmLabel: '저장',
+    });
+    if (!newTitle || newTitle === manual.title) return;
+    updateManual.mutate({ id: manual.id, title: newTitle }, { onError: (e) => alert('수정 실패', e.message) });
+  }
+
+  const urls = useMemo(() => (manual ? manual.videoPaths.map(getVideoPublicUrl) : []), [manual]);
+  const urlsRef = useRef<string[]>([]);
+  const indexRef = useRef(0);
   const player = useVideoPlayer('', (p) => {
     p.loop = false;
   });
 
+  // 첫 클립부터 재생
   useEffect(() => {
-    if (!videoUrl) return;
-    player.replace(videoUrl);
+    urlsRef.current = urls;
+    indexRef.current = 0;
+    if (urls.length > 0) {
+      player.replace(urls[0]);
+      player.play();
+    }
+  }, [urls, player]);
+
+  // 한 클립이 끝나면 다음 클립으로 이어 재생
+  useEffect(() => {
+    const sub = player.addListener('playToEnd', () => {
+      const next = indexRef.current + 1;
+      if (next < urlsRef.current.length) {
+        indexRef.current = next;
+        player.replace(urlsRef.current[next]);
+        player.play();
+      }
+    });
+    return () => sub.remove();
+  }, [player]);
+
+  function handleReplay() {
+    if (urlsRef.current.length === 0) return;
+    indexRef.current = 0;
+    player.replace(urlsRef.current[0]);
     player.play();
-  }, [videoUrl, player]);
+  }
 
   if (isLoading) {
     return (
@@ -48,12 +94,33 @@ export default function ViewerScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <BackButton />
+      <View style={styles.topBar}>
+        <BackButton />
+        {isOwner && (
+          <Pressable
+            onPress={handleEditTitle}
+            accessibilityRole="button"
+            accessibilityLabel="제목 수정"
+            hitSlop={10}
+            style={({ pressed }) => [styles.editBtn, pressed && styles.editPressed]}>
+            <Ionicons name="create-outline" size={20} color={Palette.white} />
+            <Text style={styles.editText}>제목 수정</Text>
+          </Pressable>
+        )}
+      </View>
       <Text style={styles.title}>{manual.title}</Text>
       <View style={styles.videoWrap}>
         <VideoView style={styles.video} player={player} contentFit="contain" nativeControls />
       </View>
-      <Text style={styles.help}>화면을 누르면 다시 볼 수 있어요</Text>
+      {manual.caption ? <Text style={styles.caption}>{manual.caption}</Text> : null}
+      <Pressable
+        onPress={handleReplay}
+        accessibilityRole="button"
+        accessibilityLabel="다시 보기"
+        style={({ pressed }) => [styles.replayBtn, pressed && styles.replayPressed]}>
+        <Ionicons name="refresh" size={28} color={Palette.white} />
+        <Text style={styles.replayText}>다시 보기</Text>
+      </Pressable>
     </SafeAreaView>
   );
 }
@@ -98,10 +165,31 @@ const styles = StyleSheet.create({
     gap: Space.md,
     padding: Space.lg,
   },
+  topBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    minHeight: 40,
+  },
   backBtn: {
-    alignSelf: 'flex-start',
     paddingHorizontal: Space.md,
     paddingVertical: Space.sm,
+  },
+  editBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginLeft: 'auto',
+    paddingHorizontal: Space.md,
+    paddingVertical: Space.sm,
+  },
+  editPressed: {
+    opacity: 0.6,
+  },
+  editText: {
+    color: Palette.white,
+    fontSize: 15,
+    fontWeight: '700',
   },
   backBtnText: {
     color: Palette.white,
@@ -126,11 +214,33 @@ const styles = StyleSheet.create({
   video: {
     flex: 1,
   },
-  help: {
-    color: '#B0B4BA',
+  caption: {
+    color: Palette.white,
     fontSize: SeniorSize.body,
+    lineHeight: 32,
     textAlign: 'center',
-    paddingVertical: Space.lg,
+    paddingHorizontal: Space.lg,
+    paddingTop: Space.md,
+  },
+  replayBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Space.sm,
+    alignSelf: 'center',
+    marginVertical: Space.lg,
+    paddingHorizontal: Space.xl,
+    paddingVertical: Space.md,
+    borderRadius: Radius.pill,
+    backgroundColor: Palette.primary,
+  },
+  replayPressed: {
+    opacity: 0.85,
+  },
+  replayText: {
+    color: Palette.white,
+    fontSize: SeniorSize.body,
+    fontWeight: '800',
   },
   statusTitle: {
     color: Palette.white,

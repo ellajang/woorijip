@@ -6,13 +6,19 @@ create table if not exists public.manuals (
   id          uuid        primary key,
   title       text        not null,
   video_path  text        not null,
+  video_paths text[]      not null default '{}',
+  caption     text,
   user_id     uuid        references auth.users (id) on delete cascade,
   created_at  timestamptz not null default now()
 );
 
--- 기존 테이블에 user_id가 없으면 추가 (마이그레이션)
+-- 기존 테이블 마이그레이션
 alter table public.manuals
   add column if not exists user_id uuid references auth.users (id) on delete cascade;
+alter table public.manuals
+  add column if not exists video_paths text[] not null default '{}';
+alter table public.manuals
+  add column if not exists caption text;
 
 alter table public.manuals enable row level security;
 

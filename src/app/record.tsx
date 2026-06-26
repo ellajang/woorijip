@@ -1,13 +1,26 @@
+import { Ionicons } from '@expo/vector-icons';
 import { CameraView, useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
+import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
+import * as VideoThumbnails from 'expo-video-thumbnails';
 import { useRef, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppButton } from '@/components/AppButton';
+import { useDialog } from '@/components/DialogProvider';
 import { Palette, Radius, Space } from '@/theme/tokens';
 
 const MAX_DURATION_SEC = 600;
+/** 무료 사용자가 한 설명서에 나눌 수 있는 클립 수 */
+const FREE_CLIPS = 3;
+/** Pro 포함 최대 클립 수 */
+const MAX_CLIPS = 10;
+
+interface Clip {
+  uri: string;
+  thumb: string | null;
+}
 
 export default function RecordScreen() {
   const router = useRouter();
@@ -15,6 +28,13 @@ export default function RecordScreen() {
   const [cameraPermission, requestCamera] = useCameraPermissions();
   const [micPermission, requestMic] = useMicrophonePermissions();
   const [isRecording, setIsRecording] = useState(false);
+  const [clips, setClips] = useState<Clip[]>([]);
+  const { alert } = useDialog();
+
+  // TODO: 구독 결제 연동 시 실제 Pro 여부로 교체
+  const isPro = false;
+  const clipLimit = isPro ? MAX_CLIPS : FREE_CLIPS;
+  const atClipLimit = clips.length >= clipLimit;
 
   const hasPermission = cameraPermission?.granted && micPermission?.granted;
 
@@ -40,13 +60,36 @@ export default function RecordScreen() {
     );
   }
 
+  function handleShutter() {
+    if (isRecording) {
+      handleStop();
+      return;
+    }
+    if (atClipLimit) {
+      alert(
+        'Pro로 업그레이드',
+        `무료는 한 설명서에 장면을 ${FREE_CLIPS}개까지 나눌 수 있어요.\nPro로 업그레이드하면 장면을 더 세세하게 나눌 수 있어요.`,
+      );
+      return;
+    }
+    handleStart();
+  }
+
   async function handleStart() {
-    if (!cameraRef.current || isRecording) return;
+    if (!cameraRef.current || isRecording || atClipLimit) return;
     setIsRecording(true);
     try {
       const video = await cameraRef.current.recordAsync({ maxDuration: MAX_DURATION_SEC });
+      setIsRecording(false);
       if (video?.uri) {
-        router.push({ pathname: '/save', params: { videoUri: video.uri } });
+        let thumb: string | null = null;
+        try {
+          const t = await VideoThumbnails.getThumbnailAsync(video.uri, { time: 300 });
+          thumb = t.uri;
+        } catch {
+          thumb = null;
+        }
+        setClips((prev) => [...prev, { uri: video.uri, thumb }]);
       }
     } catch {
       setIsRecording(false);
@@ -56,27 +99,94 @@ export default function RecordScreen() {
   function handleStop() {
     if (!cameraRef.current || !isRecording) return;
     cameraRef.current.stopRecording();
-    setIsRecording(false);
   }
+
+  function handleRemove(index: number) {
+    setClips((prev) => prev.filter((_, i) => i !== index));
+  }
+
+  function handleDone() {
+    if (clips.length === 0) return;
+    router.push({ pathname: '/save', params: { clipsJson: JSON.stringify(clips.map((c) => c.uri)) } });
+  }
+
+  const takeNumber = clips.length + 1;
+  const takeText = isRecording
+    ? `● ${takeNumber}번 촬영 중`
+    : atClipLimit
+      ? `무료는 ${FREE_CLIPS}개까지 — Pro로 더 나눠요`
+      : `${takeNumber}번 촬영`;
 
   return (
     <View style={styles.black}>
-      <CameraView ref={cameraRef} style={StyleSheet.absoluteFill} mode="video" facing="back" />
-      <SafeAreaView style={styles.overlay} edges={['top', 'bottom']}>
-        <View style={styles.hintBar}>
-          <Text style={styles.hint}>
-            {isRecording ? '● 녹화 중… (최대 10분)' : '버튼을 누르면 녹화가 시작돼요'}
-          </Text>
+      <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
+        <View style={styles.cameraBox}>
+          <CameraView ref={cameraRef} style={StyleSheet.absoluteFill} mode="video" facing="back" />
+          <View style={styles.takeBar}>
+            <Text style={styles.takeText}>{takeText}</Text>
+          </View>
         </View>
 
+        {clips.length > 0 && (
+          <ScrollView
+            horizontal
+            style={styles.strip}
+            contentContainerStyle={styles.stripContent}
+            showsHorizontalScrollIndicator={false}>
+            {clips.map((clip, i) => (
+              <View key={`${clip.uri}-${i}`} style={styles.clipItem}>
+                {clip.thumb ? (
+                  <Image source={{ uri: clip.thumb }} style={styles.clipThumb} contentFit="cover" />
+                ) : (
+                  <View style={[styles.clipThumb, styles.clipThumbEmpty]} />
+                )}
+                <View style={styles.clipNumberOverlay}>
+                  <Text style={styles.clipNumberText}>{i + 1}</Text>
+                </View>
+                <Pressable
+                  onPress={() => handleRemove(i)}
+                  hitSlop={8}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${i + 1}번 장면 삭제`}
+                  style={styles.clipDelete}>
+                  <Ionicons name="close-circle" size={20} color={Palette.white} />
+                </Pressable>
+              </View>
+            ))}
+          </ScrollView>
+        )}
+
         <View style={styles.controls}>
+          <View style={styles.sideBtn} />
+
           <Pressable
-            onPress={isRecording ? handleStop : handleStart}
+            onPress={handleShutter}
             accessibilityRole="button"
-            accessibilityLabel={isRecording ? '녹화 종료' : '녹화 시작'}
+            accessibilityLabel={
+              isRecording ? '장면 녹화 종료' : atClipLimit ? 'Pro 안내' : '장면 녹화 시작'
+            }
             style={styles.shutterOuter}>
-            <View style={[styles.shutterInner, isRecording && styles.shutterInnerRecording]} />
+            {atClipLimit && !isRecording ? (
+              <View style={styles.shutterLock}>
+                <Ionicons name="lock-closed" size={30} color={Palette.white} />
+              </View>
+            ) : (
+              <View style={[styles.shutterInner, isRecording && styles.shutterInnerRecording]} />
+            )}
           </Pressable>
+
+          {clips.length > 0 && !isRecording ? (
+            <Pressable
+              onPress={handleDone}
+              accessibilityRole="button"
+              accessibilityLabel="촬영 완료"
+              style={({ pressed }) => [styles.sideBtn, pressed && styles.sideBtnPressed]}>
+              <Ionicons name="checkmark-circle" size={32} color={Palette.primary} />
+              <Text style={styles.sideBtnText}>완료</Text>
+            </Pressable>
+          ) : (
+            <View style={styles.sideBtn} />
+          )}
         </View>
       </SafeAreaView>
     </View>
@@ -88,26 +198,93 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#000',
   },
-  overlay: {
+  safe: {
     flex: 1,
-    justifyContent: 'space-between',
   },
-  hintBar: {
+  cameraBox: {
+    flex: 1,
+    margin: Space.sm,
+    borderRadius: Radius.lg,
+    overflow: 'hidden',
+    backgroundColor: '#111',
+  },
+  takeBar: {
+    position: 'absolute',
+    top: Space.md,
     alignSelf: 'center',
-    marginTop: Space.md,
-    paddingHorizontal: Space.md,
+    paddingHorizontal: Space.lg,
     paddingVertical: Space.sm,
     borderRadius: Radius.pill,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: 'rgba(0,0,0,0.55)',
   },
-  hint: {
+  takeText: {
     color: Palette.white,
-    fontSize: 15,
-    fontWeight: '600',
+    fontSize: 22,
+    fontWeight: '800',
+    letterSpacing: -0.3,
+  },
+  strip: {
+    maxHeight: 84,
+    flexGrow: 0,
+  },
+  stripContent: {
+    paddingHorizontal: Space.md,
+    paddingVertical: Space.sm,
+    gap: Space.sm,
+    alignItems: 'center',
+  },
+  clipItem: {
+    width: 50,
+    height: 64,
+  },
+  clipThumb: {
+    width: 50,
+    height: 64,
+    borderRadius: Radius.sm,
+    backgroundColor: '#333',
+  },
+  clipThumbEmpty: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  clipNumberOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    borderRadius: Radius.sm,
+  },
+  clipNumberText: {
+    color: Palette.white,
+    fontSize: 24,
+    fontWeight: '800',
+  },
+  clipDelete: {
+    position: 'absolute',
+    top: -7,
+    right: -7,
+    backgroundColor: '#000',
+    borderRadius: Radius.pill,
   },
   controls: {
+    flexDirection: 'row',
     alignItems: 'center',
-    paddingBottom: Space.xl,
+    justifyContent: 'space-around',
+    paddingVertical: Space.md,
+  },
+  sideBtn: {
+    width: 84,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+  },
+  sideBtnPressed: {
+    opacity: 0.7,
+  },
+  sideBtnText: {
+    color: Palette.white,
+    fontSize: 13,
+    fontWeight: '700',
   },
   shutterOuter: {
     width: 84,
@@ -128,6 +305,14 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 6,
+  },
+  shutterLock: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   permission: {
     flex: 1,

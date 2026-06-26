@@ -29,8 +29,8 @@ export default function HomeScreen() {
   function guardCreate(proceed: () => void) {
     if (atFreeLimit) {
       alert(
-        '무료 한도에 도달했어요',
-        `무료로는 설명서를 ${FREE_LIMIT}개까지 만들 수 있어요.\n기존 설명서를 삭제하거나, 곧 나올 Pro를 이용해주세요.`,
+        'Pro로 업그레이드',
+        `무료는 설명서를 ${FREE_LIMIT}개까지 만들 수 있어요.\nPro로 업그레이드하면 더 만들 수 있어요.`,
       );
       return;
     }
@@ -46,7 +46,7 @@ export default function HomeScreen() {
     });
     if (!ok) return;
     deleteManual.mutate(
-      { id: manual.id, videoPath: manual.videoPath },
+      { id: manual.id, videoPaths: manual.videoPaths },
       { onError: (e) => alert('삭제 실패', e.message) },
     );
   }
@@ -55,11 +55,13 @@ export default function HomeScreen() {
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['videos'],
+        allowsMultipleSelection: true,
         videoMaxDuration: 600,
         quality: 1,
       });
-      if (!result.canceled && result.assets[0]?.uri) {
-        router.push({ pathname: '/save', params: { videoUri: result.assets[0].uri } });
+      if (!result.canceled && result.assets.length > 0) {
+        const uris = result.assets.map((a) => a.uri);
+        router.push({ pathname: '/save', params: { clipsJson: JSON.stringify(uris) } });
       }
     } catch (e) {
       alert('영상 가져오기 실패', e instanceof Error ? e.message : '잠시 후 다시 시도해주세요.');
