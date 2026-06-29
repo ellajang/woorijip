@@ -78,8 +78,7 @@ export default function ViewerScreen() {
     setCurrent(0);
     setProgress(0);
     if (urls.length > 0) {
-      player.replace(urls[0]);
-      player.play();
+      player.replaceAsync(urls[0]).then(() => player.play()).catch(() => {});
     }
   }, [urls, player]);
 
@@ -91,8 +90,7 @@ export default function ViewerScreen() {
         indexRef.current = next;
         setCurrent(next);
         setProgress(0);
-        player.replace(urlsRef.current[next]);
-        player.play();
+        player.replaceAsync(urlsRef.current[next]).then(() => player.play()).catch(() => {});
       }
     });
     return () => sub.remove();
@@ -103,8 +101,7 @@ export default function ViewerScreen() {
     indexRef.current = index;
     setCurrent(index);
     setProgress(0);
-    player.replace(urlsRef.current[index]);
-    player.play();
+    player.replaceAsync(urlsRef.current[index]).then(() => player.play()).catch(() => {});
   }
 
   function handleReplay() {
@@ -190,8 +187,12 @@ export default function ViewerScreen() {
             </View>
           )}
         </Pressable>
+        {manual.captions[current] ? (
+          <View style={styles.captionBar} pointerEvents="none">
+            <Text style={styles.captionText}>{manual.captions[current]}</Text>
+          </View>
+        ) : null}
       </View>
-      {manual.caption ? <Text style={styles.caption}>{manual.caption}</Text> : null}
       <Pressable
         onPress={handleReplay}
         accessibilityRole="button"
@@ -357,13 +358,25 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingLeft: 4,
   },
-  caption: {
+  captionBar: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: Space.md,
+    alignItems: 'center',
+    paddingHorizontal: Space.md,
+  },
+  captionText: {
     color: Palette.white,
     fontSize: SeniorSize.body,
-    lineHeight: 32,
+    fontWeight: '800',
+    lineHeight: 30,
     textAlign: 'center',
-    paddingHorizontal: Space.lg,
-    paddingTop: Space.md,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    paddingHorizontal: Space.md,
+    paddingVertical: Space.sm,
+    borderRadius: Radius.md,
+    overflow: 'hidden',
   },
   replayBtn: {
     flexDirection: 'row',

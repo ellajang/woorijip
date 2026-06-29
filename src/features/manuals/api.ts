@@ -16,7 +16,8 @@ import { CreateManualInput, Manual, ManualRow, mapManualRow } from './types';
 export async function createManual({
   title,
   videoUris,
-  caption,
+  captions,
+  onProgress,
 }: CreateManualInput): Promise<Manual> {
   const {
     data: { user },
@@ -31,6 +32,8 @@ export async function createManual({
   const id = randomUUID();
   const videoPaths: string[] = [];
 
+  onProgress?.(0, videoUris.length);
+
   // 클립을 순서대로 업로드. 중간 실패 시 지금까지 올린 것 정리.
   for (let i = 0; i < videoUris.length; i++) {
     const path = `${id}-${i}.mp4`;
@@ -43,6 +46,7 @@ export async function createManual({
       throw new Error(`영상 업로드 실패: ${uploadError.message}`);
     }
     videoPaths.push(path);
+    onProgress?.(i + 1, videoUris.length);
   }
 
   const { data, error } = await supabase
@@ -52,7 +56,7 @@ export async function createManual({
       title,
       video_path: videoPaths[0],
       video_paths: videoPaths,
-      caption: caption?.trim() || null,
+      captions: (captions ?? []).map((c) => c.trim()),
       user_id: user.id,
     })
     .select()

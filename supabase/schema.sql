@@ -8,6 +8,7 @@ create table if not exists public.manuals (
   video_path  text        not null,
   video_paths text[]      not null default '{}',
   caption     text,
+  captions    text[]      not null default '{}',
   user_id     uuid        references auth.users (id) on delete cascade,
   created_at  timestamptz not null default now()
 );
@@ -19,6 +20,8 @@ alter table public.manuals
   add column if not exists video_paths text[] not null default '{}';
 alter table public.manuals
   add column if not exists caption text;
+alter table public.manuals
+  add column if not exists captions text[] not null default '{}';
 
 alter table public.manuals enable row level security;
 

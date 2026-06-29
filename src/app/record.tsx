@@ -10,17 +10,16 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppButton } from '@/components/AppButton';
 import { useDialog } from '@/components/DialogProvider';
+import { clipLimit } from '@/features/subscription/limits';
+import { useSubscription } from '@/features/subscription/SubscriptionContext';
 import { Palette, Radius, Space } from '@/theme/tokens';
 
 const MAX_DURATION_SEC = 600;
-/** 무료 사용자가 한 설명서에 나눌 수 있는 클립 수 */
-const FREE_CLIPS = 3;
-/** Pro 포함 최대 클립 수 */
-const MAX_CLIPS = 10;
 
 interface Clip {
   uri: string;
   thumb: string | null;
+  caption: string;
 }
 
 export default function RecordScreen() {
@@ -33,7 +32,8 @@ export default function RecordScreen() {
   const [countdown, setCountdown] = useState<number | null>(null);
   const [elapsed, setElapsed] = useState(0);
   const countdownRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const { alert } = useDialog();
+  const { isPro } = useSubscription();
+  const { prompt } = useDialog();
 
   // 언마운트 시 카운트다운 타이머 정리
   useEffect(() => {
@@ -52,10 +52,7 @@ export default function RecordScreen() {
     return () => clearInterval(id);
   }, [isRecording]);
 
-  // TODO: 구독 결제 연동 시 실제 Pro 여부로 교체
-  const isPro = false;
-  const clipLimit = isPro ? MAX_CLIPS : FREE_CLIPS;
-  const atClipLimit = clips.length >= clipLimit;
+  const atClipLimit = clips.length >= clipLimit(isPro);
 
   const hasPermission = cameraPermission?.granted && micPermission?.granted;
 
@@ -88,10 +85,7 @@ export default function RecordScreen() {
     }
     if (countdown !== null) return;
     if (atClipLimit) {
-      alert(
-        'Pro로 업그레이드',
-        `무료는 한 설명서에 장면을 ${FREE_CLIPS}개까지 나눌 수 있어요.\nPro로 업그레이드하면 장면을 더 세세하게 나눌 수 있어요.`,
-      );
+      router.push('/paywall');
       return;
     }
     startCountdown();
@@ -131,7 +125,7 @@ export default function RecordScreen() {
         } catch {
           thumb = null;
         }
-        setClips((prev) => [...prev, { uri: video.uri, thumb }]);
+        setClips((prev) => [...prev, { uri: video.uri, thumb, caption: '' }]);
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       }
     } catch {
@@ -149,9 +143,27 @@ export default function RecordScreen() {
     setClips((prev) => prev.filter((_, i) => i !== index));
   }
 
+  async function handleEditCaption(index: number) {
+    const current = clips[index]?.caption ?? '';
+    const text = await prompt({
+      title: `${index + 1}번 장면 자막`,
+      defaultValue: current,
+      placeholder: '예: 초록 스티커 붙인 버튼을 누르세요',
+      confirmLabel: '저장',
+    });
+    if (text === null) return;
+    setClips((prev) => prev.map((c, i) => (i === index ? { ...c, caption: text } : c)));
+  }
+
   function handleDone() {
     if (clips.length === 0) return;
-    router.push({ pathname: '/save', params: { clipsJson: JSON.stringify(clips.map((c) => c.uri)) } });
+    router.push({
+      pathname: '/save',
+      params: {
+        clipsJson: JSON.stringify(clips.map((c) => c.uri)),
+        captionsJson: JSON.stringify(clips.map((c) => c.caption)),
+      },
+    });
   }
 
   const takeNumber = clips.length + 1;
@@ -178,32 +190,49 @@ export default function RecordScreen() {
         </View>
 
         {clips.length > 0 && (
-          <ScrollView
-            horizontal
-            style={styles.strip}
-            contentContainerStyle={styles.stripContent}
-            showsHorizontalScrollIndicator={false}>
-            {clips.map((clip, i) => (
-              <View key={`${clip.uri}-${i}`} style={styles.clipItem}>
-                {clip.thumb ? (
-                  <Image source={{ uri: clip.thumb }} style={styles.clipThumb} contentFit="cover" />
-                ) : (
-                  <View style={[styles.clipThumb, styles.clipThumbEmpty]} />
-                )}
-                <View style={styles.clipNumberOverlay}>
-                  <Text style={styles.clipNumberText}>{i + 1}</Text>
+          <View>
+            {!isRecording && <Text style={styles.stripHint}>장면을 눌러 자막을 넣어요</Text>}
+            <ScrollView
+              horizontal
+              style={styles.strip}
+              contentContainerStyle={styles.stripContent}
+              showsHorizontalScrollIndicator={false}>
+              {clips.map((clip, i) => (
+                <View key={`${clip.uri}-${i}`} style={styles.clipItem}>
+                  <Pressable
+                    onPress={() => handleEditCaption(i)}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${i + 1}번 장면 자막 넣기`}>
+                    {clip.thumb ? (
+                      <Image
+                        source={{ uri: clip.thumb }}
+                        style={styles.clipThumb}
+                        contentFit="cover"
+                      />
+                    ) : (
+                      <View style={[styles.clipThumb, styles.clipThumbEmpty]} />
+                    )}
+                    <View style={styles.clipNumberOverlay}>
+                      <Text style={styles.clipNumberText}>{i + 1}</Text>
+                    </View>
+                    {clip.caption.length > 0 && (
+                      <View style={styles.clipCaptionDot}>
+                        <Ionicons name="chatbubble-ellipses" size={11} color={Palette.white} />
+                      </View>
+                    )}
+                  </Pressable>
+                  <Pressable
+                    onPress={() => handleRemove(i)}
+                    hitSlop={8}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${i + 1}번 장면 삭제`}
+                    style={styles.clipDelete}>
+                    <Ionicons name="close-circle" size={20} color={Palette.white} />
+                  </Pressable>
                 </View>
-                <Pressable
-                  onPress={() => handleRemove(i)}
-                  hitSlop={8}
-                  accessibilityRole="button"
-                  accessibilityLabel={`${i + 1}번 장면 삭제`}
-                  style={styles.clipDelete}>
-                  <Ionicons name="close-circle" size={20} color={Palette.white} />
-                </Pressable>
-              </View>
-            ))}
-          </ScrollView>
+              ))}
+            </ScrollView>
+          </View>
         )}
 
         <View style={styles.controls}>
@@ -284,6 +313,13 @@ const styles = StyleSheet.create({
     fontSize: 120,
     fontWeight: '900',
   },
+  stripHint: {
+    color: 'rgba(255,255,255,0.75)',
+    fontSize: 12,
+    fontWeight: '600',
+    textAlign: 'center',
+    paddingTop: Space.xs,
+  },
   strip: {
     maxHeight: 84,
     flexGrow: 0,
@@ -326,6 +362,17 @@ const styles = StyleSheet.create({
     right: -7,
     backgroundColor: '#000',
     borderRadius: Radius.pill,
+  },
+  clipCaptionDot: {
+    position: 'absolute',
+    bottom: 3,
+    right: 3,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: Palette.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   controls: {
     flexDirection: 'row',

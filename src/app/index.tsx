@@ -1,37 +1,48 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { Stack, useRouter } from 'expo-router';
+import { useEffect, useRef } from 'react';
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+
+import { ONBOARDING_KEY } from '@/app/onboarding';
 
 import { AppButton } from '@/components/AppButton';
 import { useDialog } from '@/components/DialogProvider';
 import { useAuth } from '@/features/auth/AuthContext';
 import { useDeleteManual, useManuals } from '@/features/manuals/hooks';
 import { Manual } from '@/features/manuals/types';
+import { FREE_MANUALS, manualLimit } from '@/features/subscription/limits';
+import { useSubscription } from '@/features/subscription/SubscriptionContext';
 import { isSupabaseConfigured } from '@/lib/config';
 import { Palette, Radius, Shadow, Space, Type } from '@/theme/tokens';
-
-/** 무료로 만들 수 있는 설명서 개수. 초과 시 Pro 안내. */
-const FREE_LIMIT = 3;
 
 export default function HomeScreen() {
   const router = useRouter();
   const { session } = useAuth();
   const { confirm, alert } = useDialog();
+  const { isPro } = useSubscription();
   const configured = isSupabaseConfigured();
   const { data: manuals, isLoading, isError, error, refetch } = useManuals(session?.user.id);
   const deleteManual = useDeleteManual();
 
+  // 첫 실행이면 온보딩 한 번 보여주기
+  const onboardingChecked = useRef(false);
+  useEffect(() => {
+    if (onboardingChecked.current) return;
+    onboardingChecked.current = true;
+    AsyncStorage.getItem(ONBOARDING_KEY).then((v) => {
+      if (!v) router.push('/onboarding');
+    });
+  }, [router]);
+
   const count = manuals?.length ?? 0;
-  const atFreeLimit = count >= FREE_LIMIT;
+  const atFreeLimit = count >= manualLimit(isPro);
 
   function guardCreate(proceed: () => void) {
     if (atFreeLimit) {
-      alert(
-        'Pro로 업그레이드',
-        `무료는 설명서를 ${FREE_LIMIT}개까지 만들 수 있어요.\nPro로 업그레이드하면 더 만들 수 있어요.`,
-      );
+      router.push('/paywall');
       return;
     }
     proceed();
@@ -112,7 +123,7 @@ export default function HomeScreen() {
 
       <View style={styles.footer}>
         <Text style={styles.usage}>
-          무료 {count}/{FREE_LIMIT}개 사용 중
+          {isPro ? 'Pro · 무제한' : `무료 ${count}/${FREE_MANUALS}개 사용 중`}
         </Text>
         <AppButton
           label="직접 촬영하기"

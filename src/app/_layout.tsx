@@ -5,6 +5,7 @@ import { useEffect } from 'react';
 
 import { DialogProvider } from '@/components/DialogProvider';
 import { AuthProvider, useAuth } from '@/features/auth/AuthContext';
+import { SubscriptionProvider } from '@/features/subscription/SubscriptionContext';
 import { queryClient } from '@/lib/queryClient';
 import { Palette } from '@/theme/tokens';
 
@@ -45,6 +46,8 @@ function RootNavigator() {
       <Stack.Screen name="save" options={{ title: '설명서 저장' }} />
       <Stack.Screen name="qr/[id]" options={{ title: 'QR 코드' }} />
       <Stack.Screen name="settings" options={{ title: '설정' }} />
+      <Stack.Screen name="paywall" options={{ title: 'Pro', presentation: 'modal' }} />
+      <Stack.Screen name="onboarding" options={{ headerShown: false, presentation: 'modal' }} />
       <Stack.Screen name="v/[id]" options={{ headerShown: false }} />
     </Stack>
   );
@@ -54,10 +57,12 @@ export default function RootLayout() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <DialogProvider>
-          <StatusBar style="dark" />
-          <RootNavigator />
-        </DialogProvider>
+        <SubscriptionProvider>
+          <DialogProvider>
+            <StatusBar style="dark" />
+            <RootNavigator />
+          </DialogProvider>
+        </SubscriptionProvider>
       </AuthProvider>
     </QueryClientProvider>
   );
