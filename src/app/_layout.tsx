@@ -39,13 +39,12 @@ function RootNavigator() {
         headerBackButtonDisplayMode: 'minimal',
         contentStyle: { backgroundColor: Palette.background },
       }}>
-      <Stack.Screen name="index" options={{ title: '우리집 설명서' }} />
+      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen name="login" options={{ headerShown: false }} />
       <Stack.Screen name="reset" options={{ title: '비밀번호 재설정' }} />
       <Stack.Screen name="record" options={{ title: '설명 영상 촬영' }} />
       <Stack.Screen name="save" options={{ title: '설명서 저장' }} />
       <Stack.Screen name="qr/[id]" options={{ title: 'QR 코드' }} />
-      <Stack.Screen name="settings" options={{ title: '설정' }} />
       <Stack.Screen name="paywall" options={{ title: 'Pro', presentation: 'modal' }} />
       <Stack.Screen name="onboarding" options={{ headerShown: false, presentation: 'modal' }} />
       <Stack.Screen name="v/[id]" options={{ headerShown: false }} />

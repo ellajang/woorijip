@@ -1,13 +1,11 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import { Stack, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { useEffect, useRef } from 'react';
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ONBOARDING_KEY } from '@/app/onboarding';
-
 import { AppButton } from '@/components/AppButton';
 import { useDialog } from '@/components/DialogProvider';
 import { useAuth } from '@/features/auth/AuthContext';
@@ -80,18 +78,7 @@ export default function HomeScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-      <Stack.Screen options={{ headerShown: false }} />
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>우리집 설명서</Text>
-        <Pressable
-          onPress={() => router.push('/settings')}
-          hitSlop={12}
-          accessibilityRole="button"
-          accessibilityLabel="설정">
-          <Ionicons name="options-outline" size={26} color={Palette.primary} />
-        </Pressable>
-      </View>
+    <View style={styles.container}>
       {!configured && <ConfigNotice />}
 
       {isLoading && configured ? (
@@ -131,11 +118,15 @@ export default function HomeScreen() {
           large
           disabled={!configured}
         />
-        <Text style={styles.galleryLink} onPress={() => guardCreate(handlePickVideo)}>
-          갤러리에서 영상 가져오기
-        </Text>
+        <Pressable
+          onPress={() => guardCreate(handlePickVideo)}
+          accessibilityRole="button"
+          style={({ pressed }) => [styles.galleryLink, pressed && styles.rowPressed]}>
+          <Ionicons name="images-outline" size={16} color={Palette.textMuted} />
+          <Text style={styles.galleryLinkText}>갤러리에서 영상 가져오기</Text>
+        </Pressable>
       </View>
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -190,7 +181,7 @@ function EmptyState() {
       </View>
       <Text style={styles.emptyTitle}>아직 만든 설명서가 없어요</Text>
       <Text style={styles.emptyBody}>
-        부모님께 설명할 영상을 찍고{'\n'}QR을 만들어 제품에 붙여보세요.
+        설명이 필요한 제품의 사용법을 찍고{'\n'}QR을 만들어 붙여보세요.
       </Text>
     </View>
   );
@@ -217,20 +208,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: Palette.background,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: Space.lg,
-    paddingTop: Space.sm,
-    paddingBottom: Space.sm,
-  },
-  headerTitle: {
-    fontSize: Type.title,
-    fontWeight: '800',
-    letterSpacing: -0.5,
-    color: Palette.text,
   },
   center: {
     flex: 1,
@@ -281,11 +258,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   galleryLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: Space.sm,
+  },
+  galleryLinkText: {
     fontSize: 15,
     color: Palette.textMuted,
-    textAlign: 'center',
-    paddingVertical: Space.sm,
     fontWeight: '600',
+    textDecorationLine: 'underline',
   },
   usage: {
     fontSize: Type.caption,

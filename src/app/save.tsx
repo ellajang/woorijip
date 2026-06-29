@@ -2,6 +2,7 @@ import { useVideoPlayer, VideoView } from 'expo-video';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import {
+  DimensionValue,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -81,6 +82,9 @@ export default function SaveScreen() {
   }
 
   const canSave = title.trim().length > 0 && !isPending;
+  const progressWidth: DimensionValue = progress
+    ? `${Math.round((progress.done / Math.max(1, progress.total)) * 100)}%`
+    : '0%';
 
   return (
     <KeyboardAvoidingView
@@ -116,32 +120,41 @@ export default function SaveScreen() {
       </ScrollView>
 
       <SafeAreaView edges={['bottom']} style={styles.footer}>
-        <AppButton
-          label="다시 촬영"
-          variant="secondary"
-          onPress={() => router.back()}
-          style={styles.footerBtn}
-        />
-        <AppButton
-          label={
-            isPending
-              ? progress && progress.total > 1
+        {isPending && progress && (
+          <View style={styles.progressWrap}>
+            <View style={styles.progressTrack}>
+              <View style={[styles.progressFill, { width: progressWidth }]} />
+            </View>
+            <Text style={styles.progressLabel}>
+              {progress.total > 1
                 ? `장면 ${progress.done}/${progress.total} 올리는 중…`
-                : '저장 중…'
-              : 'QR 만들기'
-          }
-          onPress={() =>
-            mutate({
-              title: title.trim(),
-              videoUris: clips,
-              captions,
-              onProgress: (done, total) => setProgress({ done, total }),
-            })
-          }
-          disabled={!canSave}
-          loading={isPending}
-          style={styles.footerBtn}
-        />
+                : '올리는 중…'}
+            </Text>
+          </View>
+        )}
+        <View style={styles.footerRow}>
+          <AppButton
+            label="다시 촬영"
+            variant="secondary"
+            onPress={() => router.back()}
+            disabled={isPending}
+            style={styles.footerBtn}
+          />
+          <AppButton
+            label={isPending ? '저장 중…' : 'QR 만들기'}
+            onPress={() =>
+              mutate({
+                title: title.trim(),
+                videoUris: clips,
+                captions,
+                onProgress: (done, total) => setProgress({ done, total }),
+              })
+            }
+            disabled={!canSave}
+            loading={isPending}
+            style={styles.footerBtn}
+          />
+        </View>
       </SafeAreaView>
     </KeyboardAvoidingView>
   );
@@ -218,14 +231,38 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   footer: {
-    flexDirection: 'row',
     gap: Space.sm,
     padding: Space.md,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: Palette.border,
   },
+  footerRow: {
+    flexDirection: 'row',
+    gap: Space.sm,
+  },
   footerBtn: {
     flex: 1,
+  },
+  progressWrap: {
+    gap: 6,
+    paddingBottom: Space.xs,
+  },
+  progressTrack: {
+    height: 8,
+    borderRadius: Radius.pill,
+    backgroundColor: Palette.primarySoft,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    borderRadius: Radius.pill,
+    backgroundColor: Palette.primary,
+  },
+  progressLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: Palette.textMuted,
+    textAlign: 'center',
   },
   errorText: {
     color: Palette.danger,
