@@ -1,5 +1,6 @@
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppButton } from '@/components/AppButton';
@@ -54,6 +55,15 @@ export default function SettingsScreen() {
           <Text style={styles.cardLabel}>로그인 계정</Text>
           <Text style={styles.cardValue}>{session?.user.email ?? '-'}</Text>
         </View>
+
+        <Text style={styles.sectionLabel}>약관</Text>
+        <Pressable
+          onPress={() => router.push('/privacy')}
+          accessibilityRole="button"
+          style={({ pressed }) => [styles.linkRow, pressed && styles.linkPressed]}>
+          <Text style={styles.linkText}>개인정보처리방침</Text>
+          <Ionicons name="chevron-forward" size={18} color={Palette.textMuted} />
+        </Pressable>
       </ScrollView>
 
       <View style={styles.footer}>
@@ -93,6 +103,23 @@ const styles = StyleSheet.create({
   },
   cardValue: {
     fontSize: Type.headline,
+    fontWeight: '600',
+    color: Palette.text,
+  },
+  linkRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: Palette.surface,
+    borderRadius: Radius.lg,
+    paddingHorizontal: Space.lg,
+    paddingVertical: Space.md,
+  },
+  linkPressed: {
+    opacity: 0.6,
+  },
+  linkText: {
+    fontSize: Type.body,
     fontWeight: '600',
     color: Palette.text,
   },

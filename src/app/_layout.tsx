@@ -9,8 +9,8 @@ import { SubscriptionProvider } from '@/features/subscription/SubscriptionContex
 import { queryClient } from '@/lib/queryClient';
 import { Palette } from '@/theme/tokens';
 
-/** 로그인 없이 접근 가능한 최상위 세그먼트 (부모님 QR 재생 + 로그인/비번재설정 화면) */
-const PUBLIC_SEGMENTS = ['v', 'login', 'reset'];
+/** 로그인 없이 접근 가능한 최상위 세그먼트 (부모님 QR 재생 + 로그인/비번재설정 + 약관) */
+const PUBLIC_SEGMENTS = ['v', 'login', 'reset', 'privacy'];
 
 function useAuthGuard() {
   const { session, isLoading } = useAuth();
@@ -46,6 +46,7 @@ function RootNavigator() {
       <Stack.Screen name="save" options={{ title: '설명서 저장' }} />
       <Stack.Screen name="qr/[id]" options={{ title: 'QR 코드' }} />
       <Stack.Screen name="paywall" options={{ title: 'Pro', presentation: 'modal' }} />
+      <Stack.Screen name="privacy" options={{ title: '개인정보처리방침' }} />
       <Stack.Screen name="onboarding" options={{ headerShown: false, presentation: 'modal' }} />
       <Stack.Screen name="v/[id]" options={{ headerShown: false }} />
     </Stack>
