@@ -11,7 +11,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppButton } from '@/components/AppButton';
 import { ManualQrCard } from '@/components/ManualQrCard';
@@ -23,6 +23,7 @@ const TITLE_EXAMPLES = ['TV 켜는 방법', '에어컨 설정', '카카오톡 �
 
 export default function SaveScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { clipsJson, captionsJson, videoUri } = useLocalSearchParams<{
     clipsJson?: string;
     captionsJson?: string;
@@ -90,7 +91,11 @@ export default function SaveScreen() {
     <KeyboardAvoidingView
       style={styles.flex}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled">
+
         <VideoView style={styles.preview} player={player} contentFit="cover" nativeControls />
 
         <Text style={styles.label}>이 설명서의 제목</Text>
@@ -119,7 +124,7 @@ export default function SaveScreen() {
         {isError && <Text style={styles.errorText}>{error?.message}</Text>}
       </ScrollView>
 
-      <SafeAreaView edges={['bottom']} style={styles.footer}>
+      <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 24) + Space.md }]}>
         {isPending && progress && (
           <View style={styles.progressWrap}>
             <View style={styles.progressTrack}>
@@ -155,27 +160,29 @@ export default function SaveScreen() {
             style={styles.footerBtn}
           />
         </View>
-      </SafeAreaView>
+      </View>
     </KeyboardAvoidingView>
   );
 }
 
 function QrResult({ title, url, onDone }: { title: string; url: string; onDone: () => void }) {
+  const insets = useSafeAreaInsets();
   return (
-    <SafeAreaView style={styles.qrScreen} edges={['bottom']}>
-      <ScrollView contentContainerStyle={styles.qrContent}>
-        <ManualQrCard title={title} url={url} />
-      </ScrollView>
-
-      <View style={styles.footer}>
-        <AppButton label="완료" onPress={onDone} large style={styles.footerBtn} />
-      </View>
-    </SafeAreaView>
+    <ScrollView
+      style={styles.qrScreen}
+      contentContainerStyle={[
+        styles.qrContent,
+        { paddingBottom: Math.max(insets.bottom, 24) + Space.lg },
+      ]}>
+      <ManualQrCard title={title} url={url} />
+      <AppButton label="완료" onPress={onDone} large style={styles.doneBtn} />
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: Palette.background },
+  scroll: { flex: 1 },
   centered: {
     flex: 1,
     alignItems: 'center',
@@ -275,5 +282,9 @@ const styles = StyleSheet.create({
   },
   qrContent: {
     padding: Space.lg,
+  },
+  doneBtn: {
+    marginTop: Space.xl,
+    alignSelf: 'stretch',
   },
 });

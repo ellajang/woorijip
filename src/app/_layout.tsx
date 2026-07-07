@@ -2,6 +2,7 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { DialogProvider } from '@/components/DialogProvider';
 import { AuthProvider, useAuth } from '@/features/auth/AuthContext';
@@ -55,15 +56,17 @@ function RootNavigator() {
 
 export default function RootLayout() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <SubscriptionProvider>
-          <DialogProvider>
-            <StatusBar style="dark" />
-            <RootNavigator />
-          </DialogProvider>
-        </SubscriptionProvider>
-      </AuthProvider>
-    </QueryClientProvider>
+    <SafeAreaProvider>
+      <QueryClientProvider client={queryClient}>
+        <AuthProvider>
+          <SubscriptionProvider>
+            <DialogProvider>
+              <StatusBar style="dark" />
+              <RootNavigator />
+            </DialogProvider>
+          </SubscriptionProvider>
+        </AuthProvider>
+      </QueryClientProvider>
+    </SafeAreaProvider>
   );
 }
