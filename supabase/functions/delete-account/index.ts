@@ -1,8 +1,14 @@
-// 계정 + 해당 사용자의 모든 데이터(설명서 row + 영상 파일) 삭제.
+// 계정 + 해당 사용자의 모든 데이터(설명서 row + R2 영상 파일) 삭제.
 // auth.users 삭제는 service_role 권한이 필요하므로 Edge Function에서 처리한다.
-// 배포: Supabase 대시보드 > Edge Functions > 새 함수 "delete-account"에 이 코드 붙여넣기
+// 영상은 Cloudflare R2에 있으므로 R2 자격증명으로 직접 삭제한다.
+//
+// 필요한 Supabase 비밀값: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY (자동),
+//   R2_ACCOUNT_ID, R2_BUCKET, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY
+//
+// 배포: Supabase 대시보드 > Edge Functions > "delete-account"에 이 코드 붙여넣기
 //      (또는 CLI: supabase functions deploy delete-account)
 import { createClient } from 'jsr:@supabase/supabase-js@2';
+import { AwsClient } from 'https://esm.sh/aws4fetch@1.0.20';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -15,6 +21,30 @@ function json(body: unknown, status: number) {
     status,
     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
   });
+}
+
+const R2_ACCOUNT_ID = Deno.env.get('R2_ACCOUNT_ID') ?? '';
+const R2_BUCKET = Deno.env.get('R2_BUCKET') ?? '';
+const R2_ENDPOINT = `https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com`;
+const r2 = new AwsClient({
+  accessKeyId: Deno.env.get('R2_ACCESS_KEY_ID') ?? '',
+  secretAccessKey: Deno.env.get('R2_SECRET_ACCESS_KEY') ?? '',
+  region: 'auto',
+  service: 's3',
+});
+
+/** R2에서 영상 파일들을 삭제. 전체 URL이면 파일명만 추출. 개별 실패는 무시. */
+async function deleteR2(paths: string[]) {
+  await Promise.all(
+    paths.map(async (p) => {
+      const key = p.includes('/') ? p.substring(p.lastIndexOf('/') + 1) : p;
+      try {
+        await r2.fetch(`${R2_ENDPOINT}/${R2_BUCKET}/${key}`, { method: 'DELETE' });
+      } catch {
+        // 무시 (고아 파일은 추후 정리)
+      }
+    }),
+  );
 }
 
 Deno.serve(async (req) => {
@@ -43,12 +73,13 @@ Deno.serve(async (req) => {
       .select('video_path, video_paths')
       .eq('user_id', userId);
 
-    // 2) 스토리지 영상 삭제 (클립 배열 우선, 없으면 단일 경로)
-    const paths = (manuals ?? []).flatMap((m: { video_path: string; video_paths: string[] | null }) =>
-      m.video_paths && m.video_paths.length > 0 ? m.video_paths : [m.video_path],
+    // 2) R2 영상 삭제 (클립 배열 우선, 없으면 단일 경로)
+    const paths = (manuals ?? []).flatMap(
+      (m: { video_path: string; video_paths: string[] | null }) =>
+        m.video_paths && m.video_paths.length > 0 ? m.video_paths : [m.video_path],
     );
     if (paths.length > 0) {
-      await admin.storage.from('videos').remove(paths);
+      await deleteR2(paths);
     }
 
     // 3) 설명서 row 삭제 (계정 삭제 시 FK cascade도 되지만 명시적으로 먼저 정리)

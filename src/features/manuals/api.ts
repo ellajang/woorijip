@@ -1,16 +1,54 @@
 import { randomUUID } from 'expo-crypto';
 
-import { VIDEO_BUCKET } from '@/lib/config';
+import { R2_PUBLIC_URL } from '@/lib/config';
 import { supabase } from '@/lib/supabase';
 
-import { readVideoForUpload } from './videoUpload';
+import { uploadVideoToUrl } from './videoUpload';
 import { CreateManualInput, Manual, ManualRow, mapManualRow } from './types';
+
+/** R2 업로드/삭제용 presigned URL을 Edge Function에서 받아 key→url 맵으로 돌려준다. */
+async function getPresignedUrls(
+  keys: string[],
+  method: 'PUT' | 'DELETE',
+): Promise<Record<string, string>> {
+  const { data, error } = await supabase.functions.invoke('r2-presign', {
+    body: { keys, method },
+  });
+  if (error) {
+    throw new Error(`업로드 준비 실패: ${error.message}`);
+  }
+  const urls = (data as { urls?: { key: string; url: string }[] })?.urls ?? [];
+  const map: Record<string, string> = {};
+  for (const u of urls) map[u.key] = u.url;
+  return map;
+}
+
+/** R2에서 영상 파일들을 삭제한다 (presigned DELETE). 실패해도 조용히 넘어간다. */
+async function removeR2Objects(keys: string[]): Promise<void> {
+  if (keys.length === 0) return;
+  try {
+    const delUrls = await getPresignedUrls(keys, 'DELETE');
+    await Promise.all(
+      keys.map(async (key) => {
+        const url = delUrls[key];
+        if (!url) return;
+        try {
+          await fetch(url, { method: 'DELETE' });
+        } catch {
+          // 개별 삭제 실패는 무시 (고아 파일은 추후 정리)
+        }
+      }),
+    );
+  } catch {
+    // presign 실패해도 상위 흐름은 계속
+  }
+}
 
 /**
  * 설명서를 생성한다.
  * 1) 클라이언트에서 id 발급 → 영상 파일명/DB id로 동시 사용
- * 2) 영상을 Storage에 업로드
- * 3) 메타데이터 row 삽입
+ * 2) 영상을 R2에 직접 업로드 (임시 URL)
+ * 3) 메타데이터 row 삽입 (video_paths엔 파일명만 저장)
  * 업로드 성공 후에만 row를 만들어 "영상 없는 설명서"가 남지 않게 한다.
  */
 export async function createManual({
@@ -30,22 +68,29 @@ export async function createManual({
   }
 
   const id = randomUUID();
+  const keys = videoUris.map((_, i) => `${id}-${i}.mp4`);
   const videoPaths: string[] = [];
 
   onProgress?.(0, videoUris.length);
 
+  // 업로드용 임시 URL 일괄 발급
+  const putUrls = await getPresignedUrls(keys, 'PUT');
+
   // 클립을 순서대로 업로드. 중간 실패 시 지금까지 올린 것 정리.
   for (let i = 0; i < videoUris.length; i++) {
-    const path = `${id}-${i}.mp4`;
-    const body = await readVideoForUpload(videoUris[i]);
-    const { error: uploadError } = await supabase.storage
-      .from(VIDEO_BUCKET)
-      .upload(path, body, { contentType: 'video/mp4', upsert: false });
-    if (uploadError) {
-      if (videoPaths.length > 0) await supabase.storage.from(VIDEO_BUCKET).remove(videoPaths);
-      throw new Error(`영상 업로드 실패: ${uploadError.message}`);
+    const key = keys[i];
+    const url = putUrls[key];
+    if (!url) {
+      if (videoPaths.length > 0) await removeR2Objects(videoPaths);
+      throw new Error('업로드 URL을 받지 못했어요.');
     }
-    videoPaths.push(path);
+    try {
+      await uploadVideoToUrl(videoUris[i], url);
+    } catch (e) {
+      if (videoPaths.length > 0) await removeR2Objects(videoPaths);
+      throw e instanceof Error ? e : new Error('영상 업로드 실패');
+    }
+    videoPaths.push(key);
     onProgress?.(i + 1, videoUris.length);
   }
 
@@ -63,7 +108,7 @@ export async function createManual({
     .single<ManualRow>();
 
   if (error || !data) {
-    await supabase.storage.from(VIDEO_BUCKET).remove(videoPaths);
+    await removeR2Objects(videoPaths);
     throw new Error(`설명서 저장 실패: ${error?.message ?? 'unknown'}`);
   }
 
@@ -128,9 +173,7 @@ export async function deleteManual({
   videoPaths: string[];
 }): Promise<void> {
   // 영상 파일들 먼저 제거 (실패해도 row 삭제는 진행 — 고아 파일은 추후 정리)
-  if (videoPaths.length > 0) {
-    await supabase.storage.from(VIDEO_BUCKET).remove(videoPaths);
-  }
+  await removeR2Objects(videoPaths);
 
   const { error } = await supabase.from('manuals').delete().eq('id', id);
   if (error) {
@@ -149,8 +192,8 @@ export async function deleteAccount(): Promise<void> {
   }
 }
 
-/** Storage 경로 → 공개 재생 URL */
+/** 저장된 영상 경로 → 공개 재생 URL (R2). 구 데이터가 전체 URL이면 그대로 사용. */
 export function getVideoPublicUrl(videoPath: string): string {
-  const { data } = supabase.storage.from(VIDEO_BUCKET).getPublicUrl(videoPath);
-  return data.publicUrl;
+  if (/^https?:\/\//.test(videoPath)) return videoPath;
+  return `${R2_PUBLIC_URL}/${videoPath}`;
 }

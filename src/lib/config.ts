@@ -9,8 +9,15 @@ export const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? ''
 
 const WEB_BASE_URL_ENV = process.env.EXPO_PUBLIC_WEB_BASE_URL ?? '';
 
-/** Supabase 영상 버킷 이름 */
+/** Supabase 영상 버킷 이름 (R2 이전 전 레거시) */
 export const VIDEO_BUCKET = 'videos';
+
+/** Cloudflare R2 영상 공개 재생 주소 (끝 슬래시 제거) */
+export const R2_PUBLIC_URL = (process.env.EXPO_PUBLIC_R2_PUBLIC_URL ?? '').replace(/\/$/, '');
+
+export function isR2Configured(): boolean {
+  return Boolean(R2_PUBLIC_URL);
+}
 
 /**
  * QR이 가리킬 웹 재생 페이지의 베이스 URL.
