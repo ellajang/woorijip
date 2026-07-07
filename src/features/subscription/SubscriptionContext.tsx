@@ -1,5 +1,7 @@
 import { createContext, useContext, useMemo, useState } from 'react';
 
+import { keepMyManualsForever } from '@/features/manuals/api';
+
 interface SubscriptionValue {
   isPro: boolean;
   /**
@@ -22,6 +24,12 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
       // TODO(RevenueCat): Purchases.purchasePackage(...) 결과로 isPro 설정
       async subscribe() {
         setIsPro(true);
+        // Pro 전환 → 기존 무료 설명서의 자동삭제 해제 (영구 보관)
+        try {
+          await keepMyManualsForever();
+        } catch {
+          // 실패해도 구독 자체는 진행 (다음 결제/복원 시 재시도됨)
+        }
       },
       // TODO(RevenueCat): Purchases.restorePurchases() 결과로 복원 처리.
       // 지금은 실제 구매 이력이 없으므로 복원할 게 없다.

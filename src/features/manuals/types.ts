@@ -9,6 +9,8 @@ export interface Manual {
   /** 만든 사람(소유자) id. 본인만 수정/삭제 가능 판단에 쓴다. */
   userId: string | null;
   createdAt: string;
+  /** 자동 삭제 예정일 (무료 설명서만 값 있음, Pro는 null = 영구 보관) */
+  expiresAt: string | null;
 }
 
 /** DB row 원본 (Supabase는 snake_case 반환) */
@@ -25,6 +27,8 @@ export interface ManualRow {
   captions: string[] | null;
   user_id: string | null;
   created_at: string;
+  /** 자동 삭제 예정일 (무료만, Pro는 null) */
+  expires_at: string | null;
 }
 
 export function mapManualRow(row: ManualRow): Manual {
@@ -41,6 +45,7 @@ export function mapManualRow(row: ManualRow): Manual {
     captions,
     userId: row.user_id ?? null,
     createdAt: row.created_at,
+    expiresAt: row.expires_at ?? null,
   };
 }
 
@@ -52,4 +57,6 @@ export interface CreateManualInput {
   captions?: string[];
   /** 업로드 진행 콜백 (올린 클립 수, 전체 수) */
   onProgress?: (uploaded: number, total: number) => void;
+  /** Pro 여부 — 무료면 30일 후 자동 삭제되도록 만료일을 설정한다 */
+  isPro?: boolean;
 }

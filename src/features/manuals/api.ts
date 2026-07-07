@@ -50,11 +50,15 @@ async function removeR2Objects(keys: string[]): Promise<void> {
  * 3) 메타데이터 row 삽입 (video_paths엔 파일명만 저장)
  * 업로드 성공 후에만 row를 만들어 "영상 없는 설명서"가 남지 않게 한다.
  */
+/** 무료 설명서 보관 기간(일). 지나면 cleanup-expired가 자동 삭제. */
+const FREE_TTL_DAYS = 30;
+
 export async function createManual({
   title,
   videoUris,
   captions,
   onProgress,
+  isPro,
 }: CreateManualInput): Promise<Manual> {
   const {
     data: { user },
@@ -100,6 +104,9 @@ export async function createManual({
       video_paths: videoPaths,
       captions: (captions ?? []).map((c) => c.trim()),
       user_id: user.id,
+      expires_at: isPro
+        ? null
+        : new Date(Date.now() + FREE_TTL_DAYS * 24 * 60 * 60 * 1000).toISOString(),
     })
     .select()
     .single<ManualRow>();
@@ -110,6 +117,15 @@ export async function createManual({
   }
 
   return mapManualRow(data);
+}
+
+/** Pro 전환 시: 내 모든 설명서의 자동삭제(만료)를 해제한다. RLS로 본인 것만. */
+export async function keepMyManualsForever(): Promise<void> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return;
+  await supabase.from('manuals').update({ expires_at: null }).eq('user_id', user.id);
 }
 
 /** 내 설명서 제목 수정. RLS로 본인 것만 가능. */

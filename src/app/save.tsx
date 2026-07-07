@@ -17,6 +17,7 @@ import { AppButton } from '@/components/AppButton';
 import { ManualQrCard } from '@/components/ManualQrCard';
 import { useCreateManual } from '@/features/manuals/hooks';
 import { manualPlaybackUrl } from '@/features/manuals/links';
+import { useSubscription } from '@/features/subscription/SubscriptionContext';
 import { Palette, Radius, Space } from '@/theme/tokens';
 
 const TITLE_EXAMPLES = ['TV 켜는 방법', '에어컨 설정', '카카오톡 사진 저장'];
@@ -30,6 +31,7 @@ export default function SaveScreen() {
     videoUri?: string;
   }>();
   const [title, setTitle] = useState('');
+  const { isPro } = useSubscription();
   const { mutate, isPending, isError, error, data: savedManual } = useCreateManual();
 
   // 녹화(여러 클립) 또는 갤러리(단일) 양쪽을 받는다.
@@ -121,6 +123,12 @@ export default function SaveScreen() {
           <Text style={styles.clipCount}>장면별 자막이 함께 저장돼요</Text>
         )}
 
+        {!isPro && (
+          <Text style={styles.freeNotice}>
+            ⏳ 무료 설명서는 30일 후 자동 삭제돼요.{'\n'}계속 보관하려면 Pro로 업그레이드하세요.
+          </Text>
+        )}
+
         {isError && <Text style={styles.errorText}>{error?.message}</Text>}
       </ScrollView>
 
@@ -152,6 +160,7 @@ export default function SaveScreen() {
                 title: title.trim(),
                 videoUris: clips,
                 captions,
+                isPro,
                 onProgress: (done, total) => setProgress({ done, total }),
               })
             }
@@ -206,6 +215,14 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: Palette.primary,
     fontWeight: '600',
+  },
+  freeNotice: {
+    fontSize: 13,
+    lineHeight: 19,
+    color: Palette.textMuted,
+    backgroundColor: Palette.primarySoft,
+    borderRadius: Radius.md,
+    padding: Space.md,
   },
   label: {
     fontSize: 16,
