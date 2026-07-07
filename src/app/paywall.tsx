@@ -2,16 +2,22 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppButton } from '@/components/AppButton';
 import { useDialog } from '@/components/DialogProvider';
 import { useSubscription } from '@/features/subscription/SubscriptionContext';
-import { FREE_CLIPS, FREE_MANUALS, PRO_CLIPS, PRO_PRICE_LABEL } from '@/features/subscription/limits';
+import {
+  FREE_CLIPS,
+  FREE_MANUALS,
+  PRO_CLIPS,
+  PRO_MANUALS,
+  PRO_PRICE_LABEL,
+} from '@/features/subscription/limits';
 import { Palette, Radius, Space, Type } from '@/theme/tokens';
 
 const BENEFITS = [
-  `설명서 무제한 만들기 (무료 ${FREE_MANUALS}개)`,
+  `설명서 ${PRO_MANUALS}개까지 만들기 (무료 ${FREE_MANUALS}개)`,
   `한 설명서에 장면 ${PRO_CLIPS}개까지 나누기 (무료 ${FREE_CLIPS}개)`,
   '자막·카테고리 등 모든 기능',
 ];
@@ -20,13 +26,14 @@ export default function PaywallScreen() {
   const router = useRouter();
   const { isPro, subscribe, restore } = useSubscription();
   const { alert } = useDialog();
+  const insets = useSafeAreaInsets();
   const [busy, setBusy] = useState(false);
 
   async function handleSubscribe() {
     setBusy(true);
     try {
       await subscribe();
-      alert('Pro 시작!', '이제 무제한으로 사용할 수 있어요.');
+      alert('Pro 시작!', `이제 설명서를 ${PRO_MANUALS}개까지 만들 수 있어요.`);
       router.back();
     } catch (e) {
       alert('결제 실패', e instanceof Error ? e.message : '잠시 후 다시 시도해주세요.');
@@ -50,7 +57,7 @@ export default function PaywallScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['bottom']}>
+    <View style={styles.container}>
       <View style={styles.content}>
         <View style={styles.badge}>
           <Text style={styles.badgeText}>PRO</Text>
@@ -70,7 +77,7 @@ export default function PaywallScreen() {
         <Text style={styles.price}>{PRO_PRICE_LABEL}</Text>
       </View>
 
-      <View style={styles.footer}>
+      <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 24) + Space.md }]}>
         {isPro ? (
           <Text style={styles.alreadyText}>이미 Pro를 이용 중이에요 🎉</Text>
         ) : (
@@ -85,7 +92,7 @@ export default function PaywallScreen() {
           닫기
         </Text>
       </View>
-    </SafeAreaView>
+    </View>
   );
 }
 

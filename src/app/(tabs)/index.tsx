@@ -11,7 +11,7 @@ import { useDialog } from '@/components/DialogProvider';
 import { useAuth } from '@/features/auth/AuthContext';
 import { useDeleteManual, useManuals } from '@/features/manuals/hooks';
 import { Manual } from '@/features/manuals/types';
-import { FREE_MANUALS, manualLimit } from '@/features/subscription/limits';
+import { FREE_MANUALS, PRO_MANUALS, manualLimit } from '@/features/subscription/limits';
 import { useSubscription } from '@/features/subscription/SubscriptionContext';
 import { isSupabaseConfigured } from '@/lib/config';
 import { Palette, Radius, Shadow, Space, Type } from '@/theme/tokens';
@@ -110,7 +110,7 @@ export default function HomeScreen() {
 
       <View style={styles.footer}>
         <Text style={styles.usage}>
-          {isPro ? 'Pro · 무제한' : `무료 ${count}/${FREE_MANUALS}개 사용 중`}
+          {isPro ? `Pro · ${count}/${PRO_MANUALS}개 사용 중` : `무료 ${count}/${FREE_MANUALS}개 사용 중`}
         </Text>
         <AppButton
           label="직접 촬영하기"
