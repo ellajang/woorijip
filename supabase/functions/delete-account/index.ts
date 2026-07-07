@@ -7,15 +7,14 @@
 //
 // 배포: Supabase 대시보드 > Edge Functions > "delete-account"에 이 코드 붙여넣기
 //      (또는 CLI: supabase functions deploy delete-account)
-import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { AwsClient } from 'https://esm.sh/aws4fetch@1.0.20';
+import { createClient } from 'jsr:@supabase/supabase-js@2';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
-
 function json(body: unknown, status: number) {
   return new Response(JSON.stringify(body), {
     status,
@@ -37,7 +36,8 @@ const r2 = new AwsClient({
 async function deleteR2(paths: string[]) {
   await Promise.all(
     paths.map(async (p) => {
-      const key = p.includes('/') ? p.substring(p.lastIndexOf('/') + 1) : p;
+      // 키는 "userId/파일명" 전체 경로 (구 데이터는 파일명만) — 그대로 삭제
+      const key = String(p);
       try {
         await r2.fetch(`${R2_ENDPOINT}/${R2_BUCKET}/${key}`, { method: 'DELETE' });
       } catch {

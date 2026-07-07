@@ -6,32 +6,31 @@ import { supabase } from '@/lib/supabase';
 import { uploadVideoToUrl } from './videoUpload';
 import { CreateManualInput, Manual, ManualRow, mapManualRow } from './types';
 
-/** R2 업로드/삭제용 presigned URL을 Edge Function에서 받아 key→url 맵으로 돌려준다. */
+/**
+ * R2 업로드/삭제용 presigned URL을 Edge Function에서 받는다.
+ * 서버가 키를 "userId/파일명"으로 강제하므로, 반환된 key(전체 경로)를 그대로 저장/사용한다.
+ * 입력 순서와 동일한 순서로 반환된다.
+ */
 async function getPresignedUrls(
   keys: string[],
   method: 'PUT' | 'DELETE',
-): Promise<Record<string, string>> {
+): Promise<{ key: string; url: string }[]> {
   const { data, error } = await supabase.functions.invoke('r2-presign', {
     body: { keys, method },
   });
   if (error) {
     throw new Error(`업로드 준비 실패: ${error.message}`);
   }
-  const urls = (data as { urls?: { key: string; url: string }[] })?.urls ?? [];
-  const map: Record<string, string> = {};
-  for (const u of urls) map[u.key] = u.url;
-  return map;
+  return (data as { urls?: { key: string; url: string }[] })?.urls ?? [];
 }
 
 /** R2에서 영상 파일들을 삭제한다 (presigned DELETE). 실패해도 조용히 넘어간다. */
 async function removeR2Objects(keys: string[]): Promise<void> {
   if (keys.length === 0) return;
   try {
-    const delUrls = await getPresignedUrls(keys, 'DELETE');
+    const presigned = await getPresignedUrls(keys, 'DELETE');
     await Promise.all(
-      keys.map(async (key) => {
-        const url = delUrls[key];
-        if (!url) return;
+      presigned.map(async ({ url }) => {
         try {
           await fetch(url, { method: 'DELETE' });
         } catch {
@@ -68,22 +67,20 @@ export async function createManual({
   }
 
   const id = randomUUID();
-  const keys = videoUris.map((_, i) => `${id}-${i}.mp4`);
+  const baseNames = videoUris.map((_, i) => `${id}-${i}.mp4`);
   const videoPaths: string[] = [];
 
   onProgress?.(0, videoUris.length);
 
-  // 업로드용 임시 URL 일괄 발급
-  const putUrls = await getPresignedUrls(keys, 'PUT');
+  // 업로드용 임시 URL 일괄 발급 (서버가 userId/파일명 전체 키를 반환, 입력 순서 유지)
+  const presigned = await getPresignedUrls(baseNames, 'PUT');
+  if (presigned.length !== videoUris.length) {
+    throw new Error('업로드 URL 발급에 실패했어요.');
+  }
 
   // 클립을 순서대로 업로드. 중간 실패 시 지금까지 올린 것 정리.
   for (let i = 0; i < videoUris.length; i++) {
-    const key = keys[i];
-    const url = putUrls[key];
-    if (!url) {
-      if (videoPaths.length > 0) await removeR2Objects(videoPaths);
-      throw new Error('업로드 URL을 받지 못했어요.');
-    }
+    const { key, url } = presigned[i];
     try {
       await uploadVideoToUrl(videoUris[i], url);
     } catch (e) {
