@@ -5,6 +5,7 @@ import { useEffect } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { DialogProvider } from '@/components/DialogProvider';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { AuthProvider, useAuth } from '@/features/auth/AuthContext';
 import { SubscriptionProvider } from '@/features/subscription/SubscriptionContext';
 import { queryClient } from '@/lib/queryClient';
@@ -57,16 +58,18 @@ function RootNavigator() {
 export default function RootLayout() {
   return (
     <SafeAreaProvider>
-      <QueryClientProvider client={queryClient}>
-        <AuthProvider>
-          <SubscriptionProvider>
-            <DialogProvider>
-              <StatusBar style="dark" />
-              <RootNavigator />
-            </DialogProvider>
-          </SubscriptionProvider>
-        </AuthProvider>
-      </QueryClientProvider>
+      <ErrorBoundary>
+        <QueryClientProvider client={queryClient}>
+          <AuthProvider>
+            <SubscriptionProvider>
+              <DialogProvider>
+                <StatusBar style="dark" />
+                <RootNavigator />
+              </DialogProvider>
+            </SubscriptionProvider>
+          </AuthProvider>
+        </QueryClientProvider>
+      </ErrorBoundary>
     </SafeAreaProvider>
   );
 }
