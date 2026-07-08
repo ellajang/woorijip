@@ -1,14 +1,40 @@
-import { Session } from '@supabase/supabase-js';
+import { makeRedirectUri } from 'expo-auth-session';
+import * as WebBrowser from 'expo-web-browser';
+import { Provider, Session } from '@supabase/supabase-js';
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 
 import { passwordResetUrl } from '@/lib/config';
 import { supabase } from '@/lib/supabase';
+
+// 브라우저에서 인증 후 앱으로 돌아올 때 세션을 마무리한다.
+WebBrowser.maybeCompleteAuthSession();
+
+/** 소셜 로그인 후 앱으로 돌아오는 리다이렉트 주소 (예: woorijip://) */
+const oauthRedirect = makeRedirectUri({ scheme: 'woorijip' });
+
+/** 콜백 URL에서 토큰/코드 파라미터를 추출 (query와 hash 둘 다 처리) */
+function parseAuthParams(url: string): Record<string, string> {
+  const out: Record<string, string> = {};
+  const query = url.includes('?') ? url.split('?')[1].split('#')[0] : '';
+  const hash = url.includes('#') ? url.split('#')[1] : '';
+  for (const part of [query, hash]) {
+    for (const pair of part.split('&')) {
+      if (!pair) continue;
+      const [k, v] = pair.split('=');
+      out[decodeURIComponent(k)] = decodeURIComponent(v ?? '');
+    }
+  }
+  return out;
+}
+
+type SocialProvider = Extract<Provider, 'google' | 'kakao'>;
 
 interface AuthValue {
   session: Session | null;
   isLoading: boolean;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string) => Promise<{ needsConfirm: boolean }>;
+  signInWithProvider: (provider: SocialProvider) => Promise<void>;
   signOut: () => Promise<void>;
   sendPasswordReset: (email: string) => Promise<void>;
   updatePassword: (password: string) => Promise<void>;
@@ -62,6 +88,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (error) throw new Error(friendlyAuthError(error.message));
         // 이메일 확인이 켜져 있으면 세션이 바로 생기지 않는다.
         return { needsConfirm: !data.session };
+      },
+      async signInWithProvider(provider) {
+        // 1) 제공자 인증 URL 발급
+        const { data, error } = await supabase.auth.signInWithOAuth({
+          provider,
+          options: { redirectTo: oauthRedirect, skipBrowserRedirect: true },
+        });
+        if (error) throw new Error(friendlyAuthError(error.message));
+        if (!data?.url) throw new Error('로그인을 시작하지 못했어요.');
+
+        // 2) 브라우저로 로그인 → 앱으로 리다이렉트
+        const result = await WebBrowser.openAuthSessionAsync(data.url, oauthRedirect);
+        if (result.type !== 'success') return; // 사용자가 창을 닫음
+
+        // 3) 콜백에서 세션 완성 (PKCE=code, implicit=token 둘 다 대응)
+        const params = parseAuthParams(result.url);
+        if (params.error_description) throw new Error(params.error_description);
+        if (params.code) {
+          const { error: exErr } = await supabase.auth.exchangeCodeForSession(params.code);
+          if (exErr) throw new Error(friendlyAuthError(exErr.message));
+        } else if (params.access_token && params.refresh_token) {
+          const { error: setErr } = await supabase.auth.setSession({
+            access_token: params.access_token,
+            refresh_token: params.refresh_token,
+          });
+          if (setErr) throw new Error(friendlyAuthError(setErr.message));
+        } else {
+          throw new Error('로그인 정보를 받지 못했어요. 다시 시도해주세요.');
+        }
       },
       async signOut() {
         // 로컬 세션만 즉시 정리한다. 'global'은 서버 토큰 폐기 호출이 실패하면

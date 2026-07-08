@@ -1,8 +1,17 @@
 import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, View } from 'react-native';
+import {
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppButton } from '@/components/AppButton';
+import { GoogleLogo, KakaoLogo } from '@/components/SocialLogos';
 import { useDialog } from '@/components/DialogProvider';
 import { useAuth } from '@/features/auth/AuthContext';
 import { Palette, Radius, Space } from '@/theme/tokens';
@@ -23,7 +32,7 @@ const SUBMIT_LABEL: Record<Mode, string> = {
 };
 
 export default function LoginScreen() {
-  const { signIn, signUp, sendPasswordReset } = useAuth();
+  const { signIn, signUp, signInWithProvider, sendPasswordReset } = useAuth();
   const { alert } = useDialog();
   const [mode, setMode] = useState<Mode>('signIn');
   const [email, setEmail] = useState('');
@@ -31,7 +40,10 @@ export default function LoginScreen() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [sent, setSent] = useState<Sent | null>(null);
+  const [showEmail, setShowEmail] = useState(false);
 
+  // 소셜 버튼만 먼저 보여주고, 이메일 폼은 눌렀을 때(또는 가입/재설정 모드) 펼친다.
+  const emailView = showEmail || mode !== 'signIn';
   const needsPassword = mode !== 'reset';
   const passwordsMatch = mode !== 'signUp' || password === confirmPassword;
   const canSubmit =
@@ -55,6 +67,17 @@ export default function LoginScreen() {
       }
     } catch (e) {
       alert('다시 확인해주세요', e instanceof Error ? e.message : '잠시 후 다시 시도해주세요.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleSocial(provider: 'google' | 'kakao') {
+    setBusy(true);
+    try {
+      await signInWithProvider(provider);
+    } catch (e) {
+      alert('로그인하지 못했어요', e instanceof Error ? e.message : '잠시 후 다시 시도해주세요.');
     } finally {
       setBusy(false);
     }
@@ -102,68 +125,103 @@ export default function LoginScreen() {
           <Text style={styles.logo}>우리집 설명서</Text>
           <Text style={styles.subtitle}>{SUBTITLE[mode]}</Text>
 
-          <TextInput
-            style={styles.input}
-            value={email}
-            onChangeText={setEmail}
-            placeholder="이메일"
-            placeholderTextColor={Palette.textMuted}
-            keyboardType="email-address"
-            autoCapitalize="none"
-            autoCorrect={false}
-            textContentType="emailAddress"
-          />
-          {needsPassword && (
-            <TextInput
-              style={styles.input}
-              value={password}
-              onChangeText={setPassword}
-              placeholder="비밀번호 (6자 이상)"
-              placeholderTextColor={Palette.textMuted}
-              secureTextEntry
-              autoCapitalize="none"
-              textContentType="password"
-            />
-          )}
-          {mode === 'signUp' && (
-            <TextInput
-              style={styles.input}
-              value={confirmPassword}
-              onChangeText={setConfirmPassword}
-              placeholder="비밀번호 확인"
-              placeholderTextColor={Palette.textMuted}
-              secureTextEntry
-              autoCapitalize="none"
-              textContentType="password"
-            />
-          )}
-          {mode === 'signUp' && confirmPassword.length > 0 && !passwordsMatch && (
-            <Text style={styles.mismatch}>비밀번호가 일치하지 않아요</Text>
-          )}
+          {!emailView ? (
+            <>
+              <Pressable
+                onPress={() => handleSocial('kakao')}
+                disabled={busy}
+                accessibilityRole="button"
+                style={({ pressed }) => [styles.kakaoBtn, pressed && styles.socialPressed]}>
+                <KakaoLogo size={20} />
+                <Text style={styles.kakaoText}>카카오로 시작하기</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => handleSocial('google')}
+                disabled={busy}
+                accessibilityRole="button"
+                style={({ pressed }) => [styles.googleBtn, pressed && styles.socialPressed]}>
+                <GoogleLogo size={20} />
+                <Text style={styles.googleText}>Google로 시작하기</Text>
+              </Pressable>
+              <Text style={styles.switch} onPress={() => setShowEmail(true)}>
+                이메일로 계속하기
+              </Text>
+            </>
+          ) : (
+            <>
+              <TextInput
+                style={styles.input}
+                value={email}
+                onChangeText={setEmail}
+                placeholder="이메일"
+                placeholderTextColor={Palette.textMuted}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoCorrect={false}
+                textContentType="emailAddress"
+              />
+              {needsPassword && (
+                <TextInput
+                  style={styles.input}
+                  value={password}
+                  onChangeText={setPassword}
+                  placeholder="비밀번호 (6자 이상)"
+                  placeholderTextColor={Palette.textMuted}
+                  secureTextEntry
+                  autoCapitalize="none"
+                  textContentType="password"
+                />
+              )}
+              {mode === 'signUp' && (
+                <TextInput
+                  style={styles.input}
+                  value={confirmPassword}
+                  onChangeText={setConfirmPassword}
+                  placeholder="비밀번호 확인"
+                  placeholderTextColor={Palette.textMuted}
+                  secureTextEntry
+                  autoCapitalize="none"
+                  textContentType="password"
+                />
+              )}
+              {mode === 'signUp' && confirmPassword.length > 0 && !passwordsMatch && (
+                <Text style={styles.mismatch}>비밀번호가 일치하지 않아요</Text>
+              )}
 
-          <AppButton
-            label={SUBMIT_LABEL[mode]}
-            onPress={handleSubmit}
-            disabled={!canSubmit}
-            loading={busy}
-            large
-          />
+              <AppButton
+                label={SUBMIT_LABEL[mode]}
+                onPress={handleSubmit}
+                disabled={!canSubmit}
+                loading={busy}
+                large
+              />
 
-          {mode === 'signIn' && (
-            <Text style={styles.forgot} onPress={() => setMode('reset')}>
-              비밀번호를 잊으셨나요?
-            </Text>
+              {mode === 'signIn' && (
+                <Text style={styles.forgot} onPress={() => setMode('reset')}>
+                  비밀번호를 잊으셨나요?
+                </Text>
+              )}
+
+              <Text
+                style={styles.switch}
+                onPress={() => setMode(mode === 'signIn' ? 'signUp' : 'signIn')}>
+                {mode === 'signUp'
+                  ? '이미 계정이 있으신가요? 로그인'
+                  : mode === 'reset'
+                    ? '← 로그인으로 돌아가기'
+                    : '계정이 없으신가요? 회원가입'}
+              </Text>
+
+              <Text
+                style={styles.forgot}
+                onPress={() => {
+                  setShowEmail(false);
+                  setMode('signIn');
+                }}>
+                ← 소셜 로그인으로
+              </Text>
+            </>
           )}
-
-          <Text
-            style={styles.switch}
-            onPress={() => setMode(mode === 'signIn' ? 'signUp' : 'signIn')}>
-            {mode === 'signUp'
-              ? '이미 계정이 있으신가요? 로그인'
-              : mode === 'reset'
-                ? '← 로그인으로 돌아가기'
-                : '계정이 없으신가요? 회원가입'}
-          </Text>
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -206,6 +264,54 @@ const styles = StyleSheet.create({
     fontSize: 17,
     color: Palette.text,
     backgroundColor: Palette.surface,
+  },
+  kakaoBtn: {
+    backgroundColor: '#FEE500',
+    borderRadius: Radius.md,
+    paddingVertical: Space.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Space.sm,
+  },
+  kakaoText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#191600',
+  },
+  googleBtn: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: Palette.border,
+    borderRadius: Radius.md,
+    paddingVertical: Space.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Space.sm,
+  },
+  googleText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: Palette.text,
+  },
+  socialPressed: {
+    opacity: 0.85,
+  },
+  divider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Space.sm,
+    paddingVertical: Space.xs,
+  },
+  dividerLine: {
+    flex: 1,
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: Palette.border,
+  },
+  dividerText: {
+    fontSize: 13,
+    color: Palette.textMuted,
   },
   mismatch: {
     fontSize: 13,

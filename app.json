@@ -58,7 +58,8 @@
           "microphonePermission": "설명 영상의 소리를 녹음하기 위해 마이크를 사용합니다.",
           "recordAudioAndroid": true
         }
-      ]
+      ],
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true,
