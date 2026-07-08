@@ -26,7 +26,7 @@ export default function SettingsScreen() {
       await signOut();
       router.replace('/login');
     } catch (e) {
-      alert('로그아웃 실패', e instanceof Error ? e.message : '잠시 후 다시 시도해주세요.');
+      alert('로그아웃하지 못했어요', e instanceof Error ? e.message : '잠시 후 다시 시도해주세요.');
     }
   }
 
@@ -43,7 +43,7 @@ export default function SettingsScreen() {
       await signOut();
       router.replace('/login');
     } catch (e) {
-      alert('계정 삭제 실패', e instanceof Error ? e.message : '잠시 후 다시 시도해주세요.');
+      alert('계정을 삭제하지 못했어요', e instanceof Error ? e.message : '잠시 후 다시 시도해주세요.');
     }
   }
 

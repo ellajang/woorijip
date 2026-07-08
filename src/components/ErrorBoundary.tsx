@@ -37,7 +37,7 @@ export class ErrorBoundary extends Component<Props, State> {
           <Text style={styles.emoji}>😵</Text>
           <Text style={styles.title}>문제가 생겼어요</Text>
           <Text style={styles.body}>
-            일시적인 오류가 발생했어요.{'\n'}다시 시도해주세요.
+            일시적인 문제가 생겼어요.{'\n'}다시 시도해주세요.
           </Text>
           <AppButton label="다시 시도" onPress={this.handleRetry} />
         </View>

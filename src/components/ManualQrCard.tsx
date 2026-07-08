@@ -67,7 +67,7 @@ export function ManualQrCard({ title, url }: { title: string; url: string }) {
       await MediaLibrary.saveToLibraryAsync(fileUri);
       alert('저장 완료', 'QR 이미지를 사진첩에 저장했어요.');
     } catch (e) {
-      alert('저장 실패', e instanceof Error ? e.message : '잠시 후 다시 시도해주세요.');
+      alert('저장하지 못했어요', e instanceof Error ? e.message : '잠시 후 다시 시도해주세요.');
     } finally {
       setBusy(null);
     }
@@ -80,7 +80,7 @@ export function ManualQrCard({ title, url }: { title: string; url: string }) {
       const base64 = await getQrBase64();
       await Print.printAsync({ html: buildLabelHtml(title, base64) });
     } catch (e) {
-      alert('출력 실패', e instanceof Error ? e.message : '잠시 후 다시 시도해주세요.');
+      alert('출력하지 못했어요', e instanceof Error ? e.message : '잠시 후 다시 시도해주세요.');
     } finally {
       setBusy(null);
     }
@@ -96,7 +96,7 @@ export function ManualQrCard({ title, url }: { title: string; url: string }) {
     } catch (e) {
       // 사용자가 공유 시트를 닫은 경우는 무시
       if (e instanceof Error && !/cancel/i.test(e.message)) {
-        alert('공유 실패', e.message);
+        alert('공유하지 못했어요', e.message);
       }
     } finally {
       setBusy(null);

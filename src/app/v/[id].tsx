@@ -34,7 +34,10 @@ export default function ViewerScreen() {
       confirmLabel: '저장',
     });
     if (!newTitle || newTitle === manual.title) return;
-    updateManual.mutate({ id: manual.id, title: newTitle }, { onError: (e) => alert('수정 실패', e.message) });
+    updateManual.mutate(
+      { id: manual.id, title: newTitle },
+      { onError: (e) => alert('수정하지 못했어요', e.message) },
+    );
   }
 
   const urls = useMemo(() => (manual ? manual.videoPaths.map(getVideoPublicUrl) : []), [manual]);

@@ -30,7 +30,7 @@ export default function ResetScreen() {
       await signOut();
       setDone(true);
     } catch (e) {
-      alert('변경 실패', e instanceof Error ? e.message : '재설정 링크를 다시 열어주세요.');
+      alert('변경하지 못했어요', e instanceof Error ? e.message : '재설정 링크를 다시 열어주세요.');
     } finally {
       setBusy(false);
     }

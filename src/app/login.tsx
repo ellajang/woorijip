@@ -48,7 +48,7 @@ export default function LoginScreen() {
         setSent({ kind: 'reset', email: email.trim() });
       }
     } catch (e) {
-      alert('오류', e instanceof Error ? e.message : '잠시 후 다시 시도해주세요.');
+      alert('다시 확인해주세요', e instanceof Error ? e.message : '잠시 후 다시 시도해주세요.');
     } finally {
       setBusy(false);
     }

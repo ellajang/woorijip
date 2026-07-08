@@ -56,7 +56,7 @@ export default function HomeScreen() {
     if (!ok) return;
     deleteManual.mutate(
       { id: manual.id, videoPaths: manual.videoPaths },
-      { onError: (e) => alert('삭제 실패', e.message) },
+      { onError: (e) => alert('삭제하지 못했어요', e.message) },
     );
   }
 
@@ -73,7 +73,7 @@ export default function HomeScreen() {
         router.push({ pathname: '/save', params: { clipsJson: JSON.stringify(uris) } });
       }
     } catch (e) {
-      alert('영상 가져오기 실패', e instanceof Error ? e.message : '잠시 후 다시 시도해주세요.');
+      alert('영상을 가져오지 못했어요', e instanceof Error ? e.message : '잠시 후 다시 시도해주세요.');
     }
   }
 

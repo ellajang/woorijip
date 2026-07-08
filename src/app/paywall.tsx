@@ -36,7 +36,7 @@ export default function PaywallScreen() {
       alert('Pro 시작!', `이제 설명서를 ${PRO_MANUALS}개까지 만들 수 있어요.`);
       router.back();
     } catch (e) {
-      alert('결제 실패', e instanceof Error ? e.message : '잠시 후 다시 시도해주세요.');
+      alert('결제하지 못했어요', e instanceof Error ? e.message : '잠시 후 다시 시도해주세요.');
     } finally {
       setBusy(false);
     }

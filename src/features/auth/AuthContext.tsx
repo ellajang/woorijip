@@ -16,6 +16,24 @@ interface AuthValue {
 
 const AuthContext = createContext<AuthValue | null>(null);
 
+/** Supabase 인증 에러(영문)를 사용자 친화 한국어 메시지로 바꾼다. */
+function friendlyAuthError(message: string): string {
+  const m = message.toLowerCase();
+  if (m.includes('invalid login credentials'))
+    return '이메일 또는 비밀번호가 올바르지 않아요.';
+  if (m.includes('email not confirmed'))
+    return '이메일 인증이 필요해요. 메일함을 확인해주세요.';
+  if (m.includes('already registered') || m.includes('already been registered'))
+    return '이미 가입된 이메일이에요. 로그인해주세요.';
+  if (m.includes('password') && (m.includes('6') || m.includes('at least')))
+    return '비밀번호는 6자 이상이어야 해요.';
+  if (m.includes('unable to validate email') || m.includes('invalid format'))
+    return '이메일 형식이 올바르지 않아요.';
+  if (m.includes('rate limit') || m.includes('for security purposes'))
+    return '요청이 너무 잦아요. 잠시 후 다시 시도해주세요.';
+  return '문제가 생겼어요. 잠시 후 다시 시도해주세요.';
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -37,11 +55,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       isLoading,
       async signIn(email, password) {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) throw new Error(error.message);
+        if (error) throw new Error(friendlyAuthError(error.message));
       },
       async signUp(email, password) {
         const { data, error } = await supabase.auth.signUp({ email, password });
-        if (error) throw new Error(error.message);
+        if (error) throw new Error(friendlyAuthError(error.message));
         // 이메일 확인이 켜져 있으면 세션이 바로 생기지 않는다.
         return { needsConfirm: !data.session };
       },
@@ -57,11 +75,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const { error } = await supabase.auth.resetPasswordForEmail(email, {
           redirectTo: passwordResetUrl(),
         });
-        if (error) throw new Error(error.message);
+        if (error) throw new Error(friendlyAuthError(error.message));
       },
       async updatePassword(password) {
         const { error } = await supabase.auth.updateUser({ password });
-        if (error) throw new Error(error.message);
+        if (error) throw new Error(friendlyAuthError(error.message));
       },
     }),
     [session, isLoading],
