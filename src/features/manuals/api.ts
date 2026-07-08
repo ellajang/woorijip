@@ -188,9 +188,13 @@ export async function deleteManual({
   // 영상 파일들 먼저 제거 (실패해도 row 삭제는 진행 — 고아 파일은 추후 정리)
   await removeR2Objects(videoPaths);
 
-  const { error } = await supabase.from('manuals').delete().eq('id', id);
+  const { data, error } = await supabase.from('manuals').delete().eq('id', id).select();
   if (error) {
     throw new Error(`삭제 실패: ${error.message}`);
+  }
+  // RLS로 막히면 에러 없이 0건 삭제됨 → 명시적으로 알린다.
+  if (!data || data.length === 0) {
+    throw new Error('삭제할 수 없어요. (내 설명서가 아니거나 로그인이 만료됐어요)');
   }
 }
 

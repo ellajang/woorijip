@@ -48,8 +48,8 @@ export default function HomeScreen() {
 
   async function handleDelete(manual: Manual) {
     const ok = await confirm({
-      title: '설명서 삭제',
-      message: '영상이 지워지고, 붙여둔 QR 스티커도 더 이상 안 열려요.',
+      title: '설명서를 삭제할까요?',
+      message: '영상과 붙여둔 QR이 모두 사라져요.\n한 번 삭제하면 되돌릴 수 없어요.',
       confirmLabel: '삭제',
       destructive: true,
     });
