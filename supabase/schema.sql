@@ -3,7 +3,7 @@
 
 -- 1) 설명서 테이블 ----------------------------------------------------------
 create table if not exists public.manuals (
-  id          uuid        primary key,
+  id          text        primary key,  -- 공유 URL용 짧은 코드 (예: k7m2xq4p)
   title       text        not null,
   video_path  text        not null,
   video_paths text[]      not null default '{}',

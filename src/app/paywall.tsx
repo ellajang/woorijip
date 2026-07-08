@@ -17,6 +17,7 @@ import {
 import { Palette, Radius, Space, Type } from '@/theme/tokens';
 
 const BENEFITS = [
+  '구독 중에는 영상이 삭제되지 않아요 (무료는 30일 후 삭제)',
   `설명서 ${PRO_MANUALS}개까지 만들기 (무료 ${FREE_MANUALS}개)`,
   `한 설명서에 장면 ${PRO_CLIPS}개까지 나누기 (무료 ${FREE_CLIPS}개)`,
   '자막·카테고리 등 모든 기능',

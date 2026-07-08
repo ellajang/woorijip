@@ -11,8 +11,8 @@ type Mode = 'signIn' | 'signUp' | 'reset';
 type Sent = { kind: 'confirm' | 'reset'; email: string };
 
 const SUBTITLE: Record<Mode, string> = {
-  signIn: '다시 오신 걸 환영해요',
-  signUp: '계정을 만들어 시작해요',
+  signIn: '한 번 찍어두면, 언제든 다시 봐요',
+  signUp: '가입하고 첫 설명서를 만들어보세요',
   reset: '가입한 이메일로 재설정 링크를 보내드려요',
 };
 
@@ -28,11 +28,17 @@ export default function LoginScreen() {
   const [mode, setMode] = useState<Mode>('signIn');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [sent, setSent] = useState<Sent | null>(null);
 
   const needsPassword = mode !== 'reset';
-  const canSubmit = email.trim().length > 0 && (!needsPassword || password.length >= 6) && !busy;
+  const passwordsMatch = mode !== 'signUp' || password === confirmPassword;
+  const canSubmit =
+    email.trim().length > 0 &&
+    (!needsPassword || password.length >= 6) &&
+    passwordsMatch &&
+    !busy;
 
   async function handleSubmit() {
     if (!canSubmit) return;
@@ -119,6 +125,21 @@ export default function LoginScreen() {
               textContentType="password"
             />
           )}
+          {mode === 'signUp' && (
+            <TextInput
+              style={styles.input}
+              value={confirmPassword}
+              onChangeText={setConfirmPassword}
+              placeholder="비밀번호 확인"
+              placeholderTextColor={Palette.textMuted}
+              secureTextEntry
+              autoCapitalize="none"
+              textContentType="password"
+            />
+          )}
+          {mode === 'signUp' && confirmPassword.length > 0 && !passwordsMatch && (
+            <Text style={styles.mismatch}>비밀번호가 일치하지 않아요</Text>
+          )}
 
           <AppButton
             label={SUBMIT_LABEL[mode]}
@@ -185,6 +206,12 @@ const styles = StyleSheet.create({
     fontSize: 17,
     color: Palette.text,
     backgroundColor: Palette.surface,
+  },
+  mismatch: {
+    fontSize: 13,
+    color: Palette.danger,
+    marginTop: -Space.xs,
+    marginLeft: Space.xs,
   },
   forgot: {
     fontSize: 14,

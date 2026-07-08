@@ -1,7 +1,17 @@
-import { randomUUID } from 'expo-crypto';
+import { getRandomBytes } from 'expo-crypto';
 
 import { R2_PUBLIC_URL } from '@/lib/config';
 import { supabase } from '@/lib/supabase';
+
+// 공유 URL에 쓰이는 짧은 설명서 ID. 헷갈리는 문자(0/O, 1/l/I) 제외한 32자 알파벳.
+const ID_ALPHABET = '23456789abcdefghijkmnpqrstuvwxyz';
+/** 짧고 읽기 쉬운 ID 생성 (예: k7m2xq4p). 32^8 ≈ 1조 → 충돌 사실상 없음. */
+function shortId(len = 8): string {
+  const bytes = getRandomBytes(len);
+  let out = '';
+  for (let i = 0; i < len; i++) out += ID_ALPHABET[bytes[i] % ID_ALPHABET.length];
+  return out;
+}
 
 import { uploadVideoToUrl } from './videoUpload';
 import { CreateManualInput, Manual, ManualRow, mapManualRow } from './types';
@@ -70,7 +80,7 @@ export async function createManual({
     throw new Error('영상이 없어요.');
   }
 
-  const id = randomUUID();
+  const id = shortId();
   const baseNames = videoUris.map((_, i) => `${id}-${i}.mp4`);
   const videoPaths: string[] = [];
 
