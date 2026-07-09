@@ -93,7 +93,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // 1) 제공자 인증 URL 발급
         const { data, error } = await supabase.auth.signInWithOAuth({
           provider,
-          options: { redirectTo: oauthRedirect, skipBrowserRedirect: true },
+          options: {
+            redirectTo: oauthRedirect,
+            skipBrowserRedirect: true,
+            // 카카오는 이메일 동의항목이 없으면 KOE205 → 닉네임만 요청
+            scopes: provider === 'kakao' ? 'profile_nickname' : undefined,
+          },
         });
         if (error) throw new Error(friendlyAuthError(error.message));
         if (!data?.url) throw new Error('로그인을 시작하지 못했어요.');
