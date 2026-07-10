@@ -3,14 +3,27 @@ import { getRandomBytes } from 'expo-crypto';
 import { R2_PUBLIC_URL } from '@/lib/config';
 import { supabase } from '@/lib/supabase';
 
-// 공유 URL에 쓰이는 짧은 설명서 ID. 헷갈리는 문자(0/O, 1/l/I) 제외한 32자 알파벳.
-const ID_ALPHABET = '23456789abcdefghijkmnpqrstuvwxyz';
-/** 짧고 읽기 쉬운 ID 생성 (예: k7m2xq4p). 32^8 ≈ 1조 → 충돌 사실상 없음. */
-function shortId(len = 8): string {
-  const bytes = getRandomBytes(len);
-  let out = '';
-  for (let i = 0; i < len; i++) out += ID_ALPHABET[bytes[i] % ID_ALPHABET.length];
-  return out;
+// 공유 URL용 설명서 ID: "형용사-명사-꼬리2자" (예: warm-tv-k3). 읽기 쉽고 URL에서 안 깨짐.
+const ID_ADJECTIVES = [
+  'warm', 'cozy', 'happy', 'bright', 'gentle', 'kind', 'calm', 'sunny', 'clear', 'easy',
+  'soft', 'cool', 'neat', 'fresh', 'smart', 'quiet', 'lucky', 'merry', 'sweet', 'brave',
+  'tidy', 'jolly', 'snug', 'shiny', 'lively',
+];
+const ID_NOUNS = [
+  'home', 'room', 'note', 'guide', 'video', 'radio', 'lamp', 'clock', 'door', 'book',
+  'star', 'cloud', 'leaf', 'bird', 'tree', 'moon', 'desk', 'cup', 'plant', 'photo',
+  'key', 'box', 'card', 'bell', 'nest',
+];
+// 꼬리 문자: 헷갈리는 0/o/1/l/i 제외
+const ID_SUFFIX = '23456789abcdefghijkmnpqrstuvwxyz';
+
+/** 읽기 쉬운 공유 ID 생성 (예: warm-tv-k3). 25×25×32² ≈ 64만 조합 → 충돌 사실상 없음. */
+function shortId(): string {
+  const b = getRandomBytes(4);
+  const adj = ID_ADJECTIVES[b[0] % ID_ADJECTIVES.length];
+  const noun = ID_NOUNS[b[1] % ID_NOUNS.length];
+  const suffix = ID_SUFFIX[b[2] % ID_SUFFIX.length] + ID_SUFFIX[b[3] % ID_SUFFIX.length];
+  return `${adj}-${noun}-${suffix}`;
 }
 
 import { uploadVideoToUrl } from './videoUpload';
