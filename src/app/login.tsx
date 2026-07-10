@@ -11,8 +11,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppButton } from '@/components/AppButton';
-import { GoogleLogo, KakaoLogo } from '@/components/SocialLogos';
 import { useDialog } from '@/components/DialogProvider';
+import { GoogleLogo, KakaoLogo } from '@/components/SocialLogos';
 import { useAuth } from '@/features/auth/AuthContext';
 import { Palette, Radius, Space } from '@/theme/tokens';
 
