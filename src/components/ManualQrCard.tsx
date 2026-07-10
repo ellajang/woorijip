@@ -52,6 +52,8 @@ export function ManualQrCard({ title, url }: { title: string; url: string }) {
   const qrRef = useRef<QrCodeRef | null>(null);
   const cardRef = useRef<View | null>(null);
   const [busy, setBusy] = useState<null | 'save' | 'print' | 'share'>(null);
+  // 투명 배경 저장: 카드 바깥만 투명, QR 뒤 흰색은 유지(스캔 보장)
+  const [transparentBg, setTransparentBg] = useState(false);
   const { alert } = useDialog();
 
   /** 현재 QR을 PNG base64로 추출 (인쇄 HTML에 넣을 용도) */
@@ -75,10 +77,16 @@ export function ManualQrCard({ title, url }: { title: string; url: string }) {
         return;
       }
       if (!cardRef.current) throw new Error('카드가 아직 준비되지 않았어요.');
-      // 제목+QR+안내가 든 카드 View를 통째로 이미지로 캡처 → 사진첩에 저장
+      // 제목+QR+안내가 든 카드 View를 통째로 이미지로 캡처 → 사진첩에 저장.
+      // 카드 배경이 투명하면(transparentBg) png가 알파를 그대로 보존한다.
       const uri = await captureRef(cardRef, { format: 'png', quality: 1 });
       await MediaLibrary.saveToLibraryAsync(uri);
-      alert('저장 완료', '제목과 QR이 담긴 카드를 사진첩에 저장했어요.');
+      alert(
+        '저장 완료',
+        transparentBg
+          ? '투명 배경 카드를 사진첩에 저장했어요.'
+          : '제목과 QR이 담긴 카드를 사진첩에 저장했어요.',
+      );
     } catch (e) {
       alert('저장하지 못했어요', e instanceof Error ? e.message : '잠시 후 다시 시도해주세요.');
     } finally {
@@ -121,7 +129,10 @@ export function ManualQrCard({ title, url }: { title: string; url: string }) {
       <Text style={styles.subtitle}>이 QR을 제품에 붙여주세요</Text>
 
       {/* 사진첩에 저장/인쇄되는 카드 그대로의 미리보기 (cardRef로 캡처) */}
-      <View ref={cardRef} collapsable={false} style={styles.card}>
+      <View
+        ref={cardRef}
+        collapsable={false}
+        style={[styles.card, transparentBg && styles.cardTransparent]}>
         <Text style={styles.cardTitle}>{title}</Text>
         <View style={styles.qrBox}>
           <QRCode value={url} size={200} getRef={(c: QrCodeRef | null) => (qrRef.current = c)} />
@@ -184,6 +195,20 @@ export function ManualQrCard({ title, url }: { title: string; url: string }) {
         </Pressable>
       </View>
 
+      <Pressable
+        onPress={() => setTransparentBg((v) => !v)}
+        disabled={busy !== null}
+        accessibilityRole="checkbox"
+        accessibilityState={{ checked: transparentBg }}
+        style={styles.toggleRow}>
+        <Ionicons
+          name={transparentBg ? 'checkbox' : 'square-outline'}
+          size={20}
+          color={transparentBg ? Palette.primary : Palette.textMuted}
+        />
+        <Text style={styles.toggleLabel}>투명 배경으로 저장 (QR 뒤는 흰색 유지)</Text>
+      </Pressable>
+
       <Text style={styles.url} selectable>
         {url}
       </Text>
@@ -213,6 +238,12 @@ const styles = StyleSheet.create({
     alignSelf: 'stretch',
     ...Shadow.card,
   },
+  cardTransparent: {
+    backgroundColor: 'transparent',
+    // 투명 저장 시 그림자는 알파에 얼룩으로 남을 수 있어 제거
+    shadowOpacity: 0,
+    elevation: 0,
+  },
   cardTitle: {
     fontSize: Type.title,
     fontWeight: '800',
@@ -220,6 +251,17 @@ const styles = StyleSheet.create({
     color: Palette.text,
     textAlign: 'center',
     marginBottom: Space.xs,
+  },
+  toggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Space.xs,
+    alignSelf: 'center',
+    paddingVertical: Space.xs,
+  },
+  toggleLabel: {
+    fontSize: 13,
+    color: Palette.textMuted,
   },
   cardHint1: {
     fontSize: 15,
