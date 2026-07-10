@@ -1,10 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
-import * as FileSystem from 'expo-file-system/legacy';
 import * as MediaLibrary from 'expo-media-library';
 import * as Print from 'expo-print';
 import { useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, Share, StyleSheet, Text, View } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
+import { captureRef } from 'react-native-view-shot';
 
 import { useDialog } from '@/components/DialogProvider';
 import { Palette, Radius, Shadow, Space, Type } from '@/theme/tokens';
@@ -14,16 +14,30 @@ interface QrCodeRef {
   toDataURL: (callback: (base64: string) => void) => void;
 }
 
-/** 인쇄용 라벨 HTML — 제목 + QR + 안내문을 테두리 카드로 깔끔하게 */
+/**
+ * 인쇄용 라벨 HTML — 제목 + QR + 안내문을 테두리 카드로.
+ * 종이 위 실제 크기를 예측 가능하게 cm 단위로 고정 (카드 약 6.5×8cm, QR 약 4cm).
+ * 스티커로 붙이기 좋고, QR 4cm면 팔 뻗은 거리에서도 잘 스캔됨.
+ */
 function buildLabelHtml(title: string, base64: string): string {
   const safeTitle = title.replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  return `<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1" /></head>
-  <body style="margin:0;display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:-apple-system,'Apple SD Gothic Neo',sans-serif;background:#fff;">
-    <div style="box-sizing:border-box;width:320px;padding:28px 24px;border:3px solid #2B8AEF;border-radius:28px;text-align:center;">
-      <div style="font-size:26px;font-weight:800;color:#1F2328;letter-spacing:-0.5px;margin-bottom:18px;">${safeTitle}</div>
-      <img src="data:image/png;base64,${base64}" style="width:240px;height:240px;" />
-      <div style="margin-top:18px;font-size:17px;font-weight:700;color:#2B8AEF;">📱 휴대폰으로 QR을 찍어보세요</div>
-      <div style="margin-top:4px;font-size:14px;color:#6B7280;">설명 영상이 바로 나와요</div>
+  return `<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    @page { margin: 0.6cm; }
+    * { box-sizing: border-box; }
+    body { margin:0; font-family:-apple-system,'Apple SD Gothic Neo',sans-serif; }
+    .card { width:6.5cm; padding:0.5cm 0.4cm; border:2px solid #2B8AEF; border-radius:0.5cm; text-align:center; }
+    .t { font-size:15pt; font-weight:800; color:#1F2328; letter-spacing:-0.3px; margin-bottom:0.3cm; line-height:1.2; }
+    .q { width:4cm; height:4cm; }
+    .h1 { margin-top:0.3cm; font-size:11pt; font-weight:700; color:#2B8AEF; }
+    .h2 { margin-top:0.1cm; font-size:9pt; color:#6B7280; }
+  </style></head>
+  <body>
+    <div class="card">
+      <div class="t">${safeTitle}</div>
+      <img class="q" src="data:image/png;base64,${base64}" />
+      <div class="h1">📱 휴대폰으로 QR을 찍어보세요</div>
+      <div class="h2">설명 영상이 바로 나와요</div>
     </div>
   </body></html>`;
 }
@@ -36,10 +50,11 @@ function buildLabelHtml(title: string, base64: string): string {
  */
 export function ManualQrCard({ title, url }: { title: string; url: string }) {
   const qrRef = useRef<QrCodeRef | null>(null);
+  const cardRef = useRef<View | null>(null);
   const [busy, setBusy] = useState<null | 'save' | 'print' | 'share'>(null);
   const { alert } = useDialog();
 
-  /** 현재 QR을 PNG base64로 추출 */
+  /** 현재 QR을 PNG base64로 추출 (인쇄 HTML에 넣을 용도) */
   function getQrBase64(): Promise<string> {
     return new Promise((resolve, reject) => {
       if (!qrRef.current) {
@@ -59,13 +74,11 @@ export function ManualQrCard({ title, url }: { title: string; url: string }) {
         alert('권한 필요', '사진 저장 권한을 허용해주세요.');
         return;
       }
-      const base64 = await getQrBase64();
-      const fileUri = `${FileSystem.cacheDirectory}woorijip-qr.png`;
-      await FileSystem.writeAsStringAsync(fileUri, base64, {
-        encoding: FileSystem.EncodingType.Base64,
-      });
-      await MediaLibrary.saveToLibraryAsync(fileUri);
-      alert('저장 완료', 'QR 이미지를 사진첩에 저장했어요.');
+      if (!cardRef.current) throw new Error('카드가 아직 준비되지 않았어요.');
+      // 제목+QR+안내가 든 카드 View를 통째로 이미지로 캡처 → 사진첩에 저장
+      const uri = await captureRef(cardRef, { format: 'png', quality: 1 });
+      await MediaLibrary.saveToLibraryAsync(uri);
+      alert('저장 완료', '제목과 QR이 담긴 카드를 사진첩에 저장했어요.');
     } catch (e) {
       alert('저장하지 못했어요', e instanceof Error ? e.message : '잠시 후 다시 시도해주세요.');
     } finally {
@@ -105,11 +118,16 @@ export function ManualQrCard({ title, url }: { title: string; url: string }) {
 
   return (
     <View style={styles.wrap}>
-      <Text style={styles.title}>{title}</Text>
       <Text style={styles.subtitle}>이 QR을 제품에 붙여주세요</Text>
 
-      <View style={styles.qrBox}>
-        <QRCode value={url} size={220} getRef={(c: QrCodeRef | null) => (qrRef.current = c)} />
+      {/* 사진첩에 저장/인쇄되는 카드 그대로의 미리보기 (cardRef로 캡처) */}
+      <View ref={cardRef} collapsable={false} style={styles.card}>
+        <Text style={styles.cardTitle}>{title}</Text>
+        <View style={styles.qrBox}>
+          <QRCode value={url} size={200} getRef={(c: QrCodeRef | null) => (qrRef.current = c)} />
+        </View>
+        <Text style={styles.cardHint1}>📱 휴대폰으로 QR을 찍어보세요</Text>
+        <Text style={styles.cardHint2}>설명 영상이 바로 나와요</Text>
       </View>
 
       <View style={styles.actions}>
@@ -178,23 +196,47 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: Space.md,
   },
-  title: {
+  subtitle: {
+    fontSize: Type.body,
+    color: Palette.textMuted,
+  },
+  // 저장/인쇄되는 라벨 카드 (스티커 미리보기 겸용)
+  card: {
+    alignItems: 'center',
+    backgroundColor: Palette.white,
+    borderWidth: 2,
+    borderColor: Palette.primary,
+    borderRadius: Radius.lg,
+    paddingVertical: Space.lg,
+    paddingHorizontal: Space.md,
+    gap: Space.sm,
+    alignSelf: 'stretch',
+    ...Shadow.card,
+  },
+  cardTitle: {
     fontSize: Type.title,
     fontWeight: '800',
     letterSpacing: -0.4,
     color: Palette.text,
     textAlign: 'center',
+    marginBottom: Space.xs,
   },
-  subtitle: {
-    fontSize: Type.body,
+  cardHint1: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: Palette.primary,
+    textAlign: 'center',
+    marginTop: Space.xs,
+  },
+  cardHint2: {
+    fontSize: 13,
     color: Palette.textMuted,
+    textAlign: 'center',
   },
   qrBox: {
-    padding: Space.lg,
+    padding: Space.sm,
     backgroundColor: Palette.white,
-    borderRadius: Radius.lg,
-    marginVertical: Space.md,
-    ...Shadow.card,
+    borderRadius: Radius.md,
   },
   actions: {
     flexDirection: 'row',
